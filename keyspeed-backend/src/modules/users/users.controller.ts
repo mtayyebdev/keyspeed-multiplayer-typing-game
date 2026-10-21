@@ -56,9 +56,11 @@ export class UsersController {
     const result = await this.usersService.deleteAccount(userId);
 
     // Clear auth cookie
+    const isProduction = process.env.NODE_ENV === 'production';
     res.clearCookie('token', {
       httpOnly: true,
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       path: '/',
     });
 

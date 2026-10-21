@@ -8,6 +8,27 @@ import { LoginDto } from './dto/login.dto';
 
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+  };
+};
+
+const getClearCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/',
+  };
+};
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -22,13 +43,7 @@ export class AuthController {
   ) {
     const result = await this.authService.register(registerDto);
 
-    res.cookie('token', result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: COOKIE_MAX_AGE,
-      path: '/',
-    });
+    res.cookie('token', result.token, getCookieOptions());
 
     return result;
   }
@@ -43,13 +58,7 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto);
 
-    res.cookie('token', result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: COOKIE_MAX_AGE,
-      path: '/',
-    });
+    res.cookie('token', result.token, getCookieOptions());
 
     return result;
   }
@@ -58,11 +67,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Clear auth cookie and logout racer' })
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('token', {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-    });
+    res.clearCookie('token', getClearCookieOptions());
 
     return { message: 'Logged out successfully' };
   }

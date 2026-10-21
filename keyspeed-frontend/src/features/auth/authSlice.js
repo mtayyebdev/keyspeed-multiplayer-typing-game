@@ -1,9 +1,11 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+const savedToken = typeof window !== 'undefined' ? localStorage.getItem('keyspeed_token') : null;
+
 const initialState = {
-  token: null,
+  token: savedToken || null,
   user: null,
-  isAuthenticated: false,
+  isAuthenticated: Boolean(savedToken),
   isInitialized: false,
   isLoading: true,
 };
@@ -19,6 +21,9 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.isInitialized = true;
       state.isLoading = false;
+      if (token) {
+        localStorage.setItem('keyspeed_token', token);
+      }
     },
     setUser: (state, action) => {
       state.user = action.payload;
@@ -32,6 +37,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.isInitialized = true;
       state.isLoading = false;
+      localStorage.removeItem('keyspeed_token');
     },
     logout: (state) => {
       state.token = null;
@@ -39,6 +45,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.isInitialized = true;
       state.isLoading = false;
+      localStorage.removeItem('keyspeed_token');
     },
     setAuthLoading: (state, action) => {
       state.isLoading = action.payload;

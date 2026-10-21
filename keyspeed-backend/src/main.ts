@@ -14,7 +14,11 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 3001;
-  const frontendUrl = configService.get<string>('FRONTEND_URL');
+  const rawFrontendUrl = configService.get<string>('FRONTEND_URL') || '';
+
+  // Trust reverse proxy (Render, Railway, Heroku, AWS, Nginx)
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
 
   // Security Headers via Helmet
   app.use(
@@ -33,9 +37,28 @@ async function bootstrap() {
   // Global prefix /api
   app.setGlobalPrefix('api');
 
+  // Parse allowed origins (trim trailing slashes and support comma-separated list)
+  const allowedOrigins = rawFrontendUrl
+    .split(',')
+    .map((url) => url.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
   // Hardened CORS configuration
   app.enableCors({
-    origin: [frontendUrl],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // If no FRONTEND_URL is specified, or origin matches allowed list, or is local dev
+      if (
+        allowedOrigins.length === 0 ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith('http://localhost')
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],

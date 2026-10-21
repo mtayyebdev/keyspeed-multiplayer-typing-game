@@ -8,7 +8,9 @@ export const baseApi = createApi({
     baseUrl,
     credentials: 'include',
     prepareHeaders: (headers, { getState }) => {
-      const token = getState()?.auth?.token;
+      const token =
+        getState()?.auth?.token ||
+        (typeof window !== 'undefined' ? localStorage.getItem('keyspeed_token') : null);
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
