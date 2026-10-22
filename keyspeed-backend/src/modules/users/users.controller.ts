@@ -57,6 +57,12 @@ export class UsersController {
 
     // Clear auth cookie
     const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie('keyspeed_token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
+    });
     res.clearCookie('token', {
       httpOnly: true,
       secure: isProduction,

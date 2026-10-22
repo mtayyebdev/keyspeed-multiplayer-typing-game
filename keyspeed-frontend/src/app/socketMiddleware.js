@@ -27,12 +27,14 @@ export const socketMiddleware = (store) => (next) => (action) => {
         return next(action);
       }
 
+      const authState = store.getState().auth;
       const token =
-        store.getState().auth?.token ||
+        authState?.keyspeed_token ||
+        authState?.token ||
         (typeof window !== 'undefined' ? localStorage.getItem('keyspeed_token') : null);
       socket = io(`${socketUrl}/race`, {
         withCredentials: true,
-        auth: { token },
+        auth: { token, keyspeed_token: token },
         transports: ['websocket', 'polling'],
       });
 

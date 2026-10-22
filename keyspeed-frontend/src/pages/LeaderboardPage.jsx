@@ -272,74 +272,76 @@ export default function LeaderboardPage() {
       {/* Live Charts Section */}
       <div className="space-y-4 mb-6">
         {/* Chart View Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
           <div className="flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-accent" />
-            <h2 className="text-lg font-bold text-fg tracking-tight">
+            <BarChart2 className="w-5 h-5 text-accent flex-shrink-0" />
+            <h2 className="text-base sm:text-lg font-bold text-fg tracking-tight">
               Leaderboard Analytics & Live Charts
             </h2>
           </div>
 
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-bg border border-border text-xs">
-            <button
-              onClick={() => setChartView('all')}
-              className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                chartView === 'all'
-                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                  : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>All Charts</span>
-            </button>
+          <div className="w-full sm:w-auto overflow-x-auto no-scrollbar -mx-1 px-1 py-0.5">
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-bg border border-border text-xs min-w-max">
+              <button
+                onClick={() => setChartView('all')}
+                className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                  chartView === 'all'
+                    ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                    : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>All Charts</span>
+              </button>
 
-            <button
-              onClick={() => setChartView('big')}
-              className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                chartView === 'big'
-                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                  : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
-              }`}
-            >
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span>Velocity (Big)</span>
-            </button>
+              <button
+                onClick={() => setChartView('big')}
+                className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                  chartView === 'big'
+                    ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                    : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
+                }`}
+              >
+                <BarChart2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Velocity (Big)</span>
+              </button>
 
-            <button
-              onClick={() => setChartView('line')}
-              className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                chartView === 'line'
-                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                  : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
-              }`}
-            >
-              <LineIcon className="w-3.5 h-3.5" />
-              <span>Rank Curve</span>
-            </button>
+              <button
+                onClick={() => setChartView('line')}
+                className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                  chartView === 'line'
+                    ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                    : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
+                }`}
+              >
+                <LineIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Rank Curve</span>
+              </button>
 
-            <button
-              onClick={() => setChartView('pie')}
-              className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                chartView === 'pie'
-                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                  : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
-              }`}
-            >
-              <PieIcon className="w-3.5 h-3.5" />
-              <span>Speed Tiers</span>
-            </button>
+              <button
+                onClick={() => setChartView('pie')}
+                className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                  chartView === 'pie'
+                    ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                    : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
+                }`}
+              >
+                <PieIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Speed Tiers</span>
+              </button>
 
-            <button
-              onClick={() => setChartView('bars')}
-              className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                chartView === 'bars'
-                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                  : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" />
-              <span>Top Typists</span>
-            </button>
+              <button
+                onClick={() => setChartView('bars')}
+                className={`px-2.5 py-1 rounded-lg transition-all duration-150 flex items-center gap-1 cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                  chartView === 'bars'
+                    ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                    : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border font-medium'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Top Typists</span>
+              </button>
+            </div>
           </div>
         </div>
 

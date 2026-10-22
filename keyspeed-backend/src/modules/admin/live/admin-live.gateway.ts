@@ -38,8 +38,10 @@ export class AdminLiveGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
     }
     if (!token && client.handshake.headers?.cookie) {
-      const match = client.handshake.headers.cookie.match(/token=([^;]+)/);
-      if (match) token = match[1];
+      const match =
+        client.handshake.headers.cookie.match(/(?:^|;\s*)keyspeed_token=([^;]+)/) ||
+        client.handshake.headers.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+      if (match) token = decodeURIComponent(match[1]);
     }
     return token;
   }

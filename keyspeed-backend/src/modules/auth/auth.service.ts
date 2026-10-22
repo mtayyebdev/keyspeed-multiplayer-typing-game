@@ -79,6 +79,7 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     return {
+      keyspeed_token: token,
       token,
       user: {
         id: saved._id,
@@ -133,6 +134,7 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     return {
+      keyspeed_token: token,
       token,
       user: {
         id: user._id,

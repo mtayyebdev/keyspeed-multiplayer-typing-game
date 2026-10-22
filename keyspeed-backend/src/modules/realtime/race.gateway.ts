@@ -55,7 +55,9 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     if (!token && client.handshake.headers?.cookie) {
       const cookieHeader = client.handshake.headers.cookie;
-      const match = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/);
+      const match =
+        cookieHeader.match(/(?:^|;\s*)keyspeed_token=([^;]+)/) ||
+        cookieHeader.match(/(?:^|;\s*)token=([^;]+)/);
       if (match) {
         token = decodeURIComponent(match[1]);
       }

@@ -4,6 +4,7 @@ const savedToken = typeof window !== 'undefined' ? localStorage.getItem('keyspee
 
 const initialState = {
   token: savedToken || null,
+  keyspeed_token: savedToken || null,
   user: null,
   isAuthenticated: Boolean(savedToken),
   isInitialized: false,
@@ -15,14 +16,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setCredentials: (state, action) => {
-      const { user, token } = action.payload || {};
-      state.token = token || null;
+      const { user, keyspeed_token, token } = action.payload || {};
+      const activeToken = keyspeed_token || token || null;
+      state.token = activeToken;
+      state.keyspeed_token = activeToken;
       state.user = user || null;
       state.isAuthenticated = true;
       state.isInitialized = true;
       state.isLoading = false;
-      if (token) {
-        localStorage.setItem('keyspeed_token', token);
+      if (activeToken) {
+        localStorage.setItem('keyspeed_token', activeToken);
       }
     },
     setUser: (state, action) => {
@@ -33,6 +36,7 @@ const authSlice = createSlice({
     },
     setUnauthenticated: (state) => {
       state.token = null;
+      state.keyspeed_token = null;
       state.user = null;
       state.isAuthenticated = false;
       state.isInitialized = true;
@@ -41,6 +45,7 @@ const authSlice = createSlice({
     },
     logout: (state) => {
       state.token = null;
+      state.keyspeed_token = null;
       state.user = null;
       state.isAuthenticated = false;
       state.isInitialized = true;

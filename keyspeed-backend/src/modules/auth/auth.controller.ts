@@ -43,7 +43,7 @@ export class AuthController {
   ) {
     const result = await this.authService.register(registerDto);
 
-    res.cookie('token', result.token, getCookieOptions());
+    res.cookie('keyspeed_token', result.token, getCookieOptions());
 
     return result;
   }
@@ -58,7 +58,7 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto);
 
-    res.cookie('token', result.token, getCookieOptions());
+    res.cookie('keyspeed_token', result.token, getCookieOptions());
 
     return result;
   }
@@ -67,6 +67,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Clear auth cookie and logout racer' })
   async logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('keyspeed_token', getClearCookieOptions());
     res.clearCookie('token', getClearCookieOptions());
 
     return { message: 'Logged out successfully' };
