@@ -40,9 +40,13 @@ const DEMO_LEADERS = [
 
 export default function LeaderboardPage() {
   const [scope, setScope] = useState('alltime'); // 'alltime' | 'daily'
+  const [selectedGameId, setSelectedGameId] = useState('classic-race'); // 'classic-race' | 'car-race'
   const [chartView, setChartView] = useState('all'); // 'all' | 'big' | 'line' | 'pie' | 'bars'
   const currentUsername = useSelector((state) => state.auth?.user?.username);
-  const { data: leaders = [], isLoading, isFetching } = useGetLeaderboardQuery(scope);
+  const { data: leaders = [], isLoading, isFetching } = useGetLeaderboardQuery({
+    scope,
+    gameId: selectedGameId,
+  });
 
   const isDemo = leaders.length === 0;
   const chartLeaders = leaders.length > 0 ? leaders : DEMO_LEADERS;
@@ -129,31 +133,58 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
-        {/* Tab switch */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-bg border border-border w-fit">
-          <button
-            onClick={() => setScope('alltime')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
-              scope === 'alltime'
-                ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            <span>All-Time</span>
-          </button>
+        {/* Game & Scope switchers */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Game Tabs */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-bg border border-border">
+            <button
+              onClick={() => setSelectedGameId('classic-race')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+                selectedGameId === 'classic-race'
+                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                  : 'bg-surface text-fg hover:bg-surface-hover border border-border'
+              }`}
+            >
+              <span>🏁 Classic Race</span>
+            </button>
+            <button
+              onClick={() => setSelectedGameId('car-race')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+                selectedGameId === 'car-race'
+                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                  : 'bg-surface text-fg hover:bg-surface-hover border border-border'
+              }`}
+            >
+              <span>🏎️ Car Race</span>
+            </button>
+          </div>
 
-          <button
-            onClick={() => setScope('daily')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
-              scope === 'daily'
-                ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
-                : 'bg-surface text-fg hover:bg-surface-hover hover:border-strong border border-border'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Today's Daily</span>
-          </button>
+          {/* Scope switch */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-bg border border-border w-fit">
+            <button
+              onClick={() => setScope('alltime')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+                scope === 'alltime'
+                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                  : 'bg-surface text-fg hover:bg-surface-hover border border-border'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>All-Time</span>
+            </button>
+
+            <button
+              onClick={() => setScope('daily')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+                scope === 'daily'
+                  ? 'bg-accent text-bg font-bold shadow-sm border border-accent'
+                  : 'bg-surface text-fg hover:bg-surface-hover border border-border'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Today's Daily</span>
+            </button>
+          </div>
         </div>
       </div>
 

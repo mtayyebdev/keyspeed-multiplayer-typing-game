@@ -25,7 +25,11 @@ export class Race {
 
   @Prop()
   roomCode?: string;
+
+  @Prop({ default: 'classic-race', index: true })
+  gameId: string;
 }
 
 export const RaceSchema = SchemaFactory.createForClass(Race);
+RaceSchema.index({ gameId: 1, startedAt: -1 });
 

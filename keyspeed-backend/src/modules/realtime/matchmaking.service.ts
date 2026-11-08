@@ -20,21 +20,29 @@ export class MatchmakingService {
     player: HumanPlayer,
     onMatchReady: (room: RoomState) => void,
     onQueueWaiting: (socketId: string) => void,
+    gameId: string = 'classic-race',
   ): Promise<RoomState> {
     const settings = this.settingsService.getSettings();
     const maxPlayers = settings.maxPlayersPerRace || 4;
     const botWaitTimeSec = settings.botWaitTime ?? 8;
     const botWaitMs = botWaitTimeSec * 1000;
+    const targetGameId = gameId || 'classic-race';
 
-    // Check if there is an open public room waiting for players
+    // Check if there is an open public room waiting for players with matching gameId
     const openRooms = this.roomService
       .getAllRooms()
-      .filter((r) => !r.isPrivate && r.status === 'lobby' && r.players.size < maxPlayers);
+      .filter(
+        (r) =>
+          !r.isPrivate &&
+          r.status === 'lobby' &&
+          (r.gameId || 'classic-race') === targetGameId &&
+          r.players.size < maxPlayers,
+      );
 
     if (openRooms.length > 0) {
       const room = openRooms[0];
       room.players.set(player.id, player);
-      this.logger.log(`Player ${player.username} joined existing open room ${room.roomId}. (Total: ${room.players.size})`);
+      this.logger.log(`Player ${player.username} joined existing open [${targetGameId}] room ${room.roomId}. (Total: ${room.players.size})`);
 
       // If room is now full, start immediately; otherwise notify player they are in queue
       if (room.players.size >= maxPlayers) {
@@ -46,7 +54,7 @@ export class MatchmakingService {
       return room;
     }
 
-    // Otherwise create a new public room
+    // Otherwise create a new public room for this game
     const randomText = await this.textsService.getRandomText();
     const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newRoom = this.roomService.createRoom(
@@ -55,9 +63,11 @@ export class MatchmakingService {
       randomText._id.toString(),
       randomText.content,
       false,
+      undefined,
+      targetGameId,
     );
 
-    this.logger.log(`Created new public room ${roomId} for ${player.username}. Starting ${botWaitTimeSec}s matchmaking timer.`);
+    this.logger.log(`Created new public [${targetGameId}] room ${roomId} for ${player.username}. Starting ${botWaitTimeSec}s matchmaking timer.`);
     onQueueWaiting(player.id);
 
     // Dynamic timer configured in admin settings

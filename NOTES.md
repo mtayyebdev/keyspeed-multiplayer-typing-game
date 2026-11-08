@@ -10,6 +10,16 @@
 - `canvas-confetti`: Lightweight canvas confetti library to fulfill the requirement: *"Results screen: animated position badge, WPM count-up animation, confetti for first place."*
 - `lucide-react`: Modern SVG icon set for game UI elements (cars, keyboard, trophies, profile, audio/visual cues) keeping the UI polished and clean.
 - `recharts`: Lightweight React charting library used in the Admin Dashboard for signups, race volume, WPM distribution, and mode split charts. Follows strict CSS variable styling (`var(--accent)`, `var(--fg)`, `var(--border)` via `getComputedStyle`) to adhere to the 3-color theme system.
+- **Car Race Addition (Zero New NPM Libraries)**: No new npm packages were added for the Car Race game. Visuals are powered by:
+  - **Pseudo-3D Canvas 2D Engine**: OutRun / classic arcade behind-the-car perspective projection drawn entirely on HTML5 Canvas 2D with requestAnimationFrame. Zero Three.js or 3D libraries.
+  - **Parallax Background**: Sunset sky gradient, clouds, distant mountain silhouettes, and rolling hills shifting horizontally with road curves and camera travel speed.
+  - **Deterministic Track Seeding**: Track curvature and hills generated deterministically from `textId`/text hash (all players see the exact same road layout).
+  - **Procedural Car Fallback**: High-detail vector rear-view sports car (bodywork, high-downforce spoiler, tinted rear window, diffuser, exhaust tips, taillights/brake lights) renders if PNG sprites in `public/assets/cars/` are absent.
+  - **Rear-View Mirror**: Top-mounted high-contrast mirror rendering trailing competitors with distance markers (`-Xm`) and headlights.
+  - **Dynamic State-Driven FX**: Dual exhaust flames scaling with speed (>100 km/h), peripheral speed lines (>170 km/h), camera shake on stall, smoke particle puffs on stall, and red flash vignette.
+  - **Dual Mode**: Includes an instantaneous toggle between "3D View" and "2D Lite" (the classic side-view track) for ultra low-power devices.
+  - **Motion Accessibility**: Automatically respects `prefers-reduced-motion` (disables shake, speed lines, and heavy particles).
+  - **Audio**: Native browser Web Audio API oscillator synthesis for dynamic engine pitch and acoustics.
 
 ## Design Decisions & Assumptions
 - **Clock Synchronization**: The server emits `startAt` (timestamp in ms). On initial connection or lobby join, the client sends a lightweight ping and receives server timestamp to estimate `clockOffset = serverTime - clientTime + rtt/2`.

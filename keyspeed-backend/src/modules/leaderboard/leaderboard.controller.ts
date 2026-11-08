@@ -10,8 +10,12 @@ export class LeaderboardController {
   @Get()
   @ApiOperation({ summary: 'Get top 20 racers for alltime or daily' })
   @ApiQuery({ name: 'scope', enum: ['daily', 'alltime'], required: false })
-  async getLeaderboard(@Query('scope') scope: 'daily' | 'alltime' = 'alltime') {
-    return this.leaderboardService.getLeaderboard(scope);
+  @ApiQuery({ name: 'gameId', required: false })
+  async getLeaderboard(
+    @Query('scope') scope: 'daily' | 'alltime' = 'alltime',
+    @Query('gameId') gameId: string = 'classic-race',
+  ) {
+    return this.leaderboardService.getLeaderboard(scope, gameId);
   }
 }
 

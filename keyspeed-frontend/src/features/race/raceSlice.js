@@ -4,6 +4,8 @@ const initialState = {
   status: 'idle', // 'idle' | 'queuing' | 'lobby' | 'ready' | 'countdown' | 'racing' | 'finished'
   roomId: null,
   roomCode: null,
+  gameId: 'classic-race',
+  gameConfig: null,
   hostId: null,
   socketId: null,
   isHost: false,
@@ -23,6 +25,9 @@ const raceSlice = createSlice({
   name: 'race',
   initialState,
   reducers: {
+    setSelectedGame: (state, action) => {
+      state.gameId = action.payload || 'classic-race';
+    },
     setSocketId: (state, action) => {
       state.socketId = action.payload;
     },
@@ -31,10 +36,12 @@ const raceSlice = createSlice({
       state.error = null;
     },
     setLobby: (state, action) => {
-      const { roomId, roomCode, hostId, isHost, players } = action.payload;
+      const { roomId, roomCode, hostId, isHost, players, gameId, gameConfig } = action.payload;
       state.status = 'lobby';
       state.roomId = roomId;
       state.roomCode = roomCode;
+      if (gameId) state.gameId = gameId;
+      if (gameConfig) state.gameConfig = gameConfig;
       if (hostId) state.hostId = hostId;
       if (isHost !== undefined) {
         state.isHost = !!isHost;
@@ -51,12 +58,16 @@ const raceSlice = createSlice({
         if (action.payload.isHost !== undefined) {
           state.isHost = !!action.payload.isHost;
         }
+        if (action.payload.gameId) state.gameId = action.payload.gameId;
+        if (action.payload.gameConfig) state.gameConfig = action.payload.gameConfig;
       }
     },
     setRaceReady: (state, action) => {
-      const { roomId, text, startAt, endAt, timeLimitSeconds, players } = action.payload;
+      const { roomId, text, startAt, endAt, timeLimitSeconds, players, gameId, gameConfig } = action.payload;
       state.status = 'ready';
       state.roomId = roomId;
+      if (gameId) state.gameId = gameId;
+      if (gameConfig) state.gameConfig = gameConfig;
       state.text = text;
       state.startAt = startAt;
       state.timeLimitSeconds = timeLimitSeconds || 60;
@@ -137,6 +148,7 @@ const raceSlice = createSlice({
 });
 
 export const {
+  setSelectedGame,
   setSocketId,
   setQueuing,
   setLobby,

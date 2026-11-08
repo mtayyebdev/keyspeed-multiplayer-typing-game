@@ -88,9 +88,6 @@ export default function Navbar() {
             <span className="text-lg sm:text-xl font-extrabold tracking-tight text-fg">
               Key<span className="text-accent">Speed</span>
             </span>
-            <span className="hidden sm:inline-block text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border border-accent/20 bg-accent-soft text-accent font-semibold ml-0.5">
-              v1
-            </span>
           </Link>
 
           {/* Desktop Navigation Links */}

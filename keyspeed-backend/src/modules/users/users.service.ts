@@ -42,6 +42,48 @@ export class UsersService {
       .populate('raceId', 'mode startedAt')
       .exec();
 
+    // Stats per game
+    const gameStatsAgg = await this.raceResultModel.aggregate([
+      { $match: { userId: user._id, flagged: false } },
+      {
+        $group: {
+          _id: { $ifNull: ['$gameId', 'classic-race'] },
+          racesPlayed: { $sum: 1 },
+          racesWon: { $sum: { $cond: [{ $eq: ['$position', 1] }, 1, 0] } },
+          avgWpm: { $avg: '$wpm' },
+          bestWpm: { $max: '$wpm' },
+          topSpeed: { $max: '$topSpeed' },
+        },
+      },
+    ]);
+
+    const statsByGame: Record<string, any> = {
+      'classic-race': {
+        racesPlayed: 0,
+        racesWon: 0,
+        avgWpm: 0,
+        bestWpm: 0,
+      },
+      'car-race': {
+        racesPlayed: 0,
+        racesWon: 0,
+        avgWpm: 0,
+        bestWpm: 0,
+        topSpeed: 0,
+      },
+    };
+
+    for (const item of gameStatsAgg) {
+      const gId = item._id || 'classic-race';
+      statsByGame[gId] = {
+        racesPlayed: item.racesPlayed,
+        racesWon: item.racesWon,
+        avgWpm: Math.round(item.avgWpm || 0),
+        bestWpm: Math.round(item.bestWpm || 0),
+        topSpeed: Math.round(item.topSpeed || 0),
+      };
+    }
+
     return {
       user: {
         id: user._id,
@@ -52,6 +94,7 @@ export class UsersService {
         racesWon: user.racesWon,
         createdAt: user.createdAt,
       },
+      statsByGame,
       lastResults,
     };
   }

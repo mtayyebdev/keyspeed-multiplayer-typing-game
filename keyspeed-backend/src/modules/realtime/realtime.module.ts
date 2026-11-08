@@ -10,6 +10,8 @@ import { TextsModule } from '../texts/texts.module';
 import { RacesModule } from '../races/races.module';
 import { UsersModule } from '../users/users.module';
 import { ClassicRaceEngine } from '../../games/classic-race.engine';
+import { CarRaceEngine } from '../../games/car-race/car-race.engine';
+import { GameRegistryService } from '../../games/game-registry.service';
 import { Settings, SettingsSchema } from '../admin/settings/settings.schema';
 
 @Module({
@@ -33,8 +35,10 @@ import { Settings, SettingsSchema } from '../admin/settings/settings.schema';
     MatchmakingService,
     BotService,
     ClassicRaceEngine,
+    CarRaceEngine,
+    GameRegistryService,
   ],
-  exports: [RaceGateway, RoomService],
+  exports: [RaceGateway, RoomService, GameRegistryService, CarRaceEngine, ClassicRaceEngine],
 })
 export class RealtimeModule {}
 

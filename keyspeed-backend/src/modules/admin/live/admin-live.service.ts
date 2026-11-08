@@ -44,6 +44,7 @@ export class AdminLiveService {
         roomId: room.roomId,
         roomCode: room.roomCode,
         isPrivate: room.isPrivate,
+        gameId: room.gameId || 'classic-race',
         status: room.status,
         createdAt: room.createdAt,
         playersCount: room.players.size,

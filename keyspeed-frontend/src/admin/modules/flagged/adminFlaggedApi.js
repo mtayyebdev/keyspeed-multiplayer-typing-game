@@ -8,6 +8,7 @@ export const adminFlaggedApi = baseApi.injectEndpoints({
         if (params.page) searchParams.set('page', params.page);
         if (params.limit) searchParams.set('limit', params.limit);
         if (params.status && params.status !== 'all') searchParams.set('status', params.status);
+        if (params.gameId && params.gameId !== 'all') searchParams.set('gameId', params.gameId);
         return `/admin/flagged?${searchParams.toString()}`;
       },
       providesTags: ['AdminFlagged'],

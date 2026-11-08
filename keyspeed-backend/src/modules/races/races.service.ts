@@ -14,6 +14,9 @@ export interface FinalPlayerResult {
   accuracy: number;
   errors: number;
   flagged: boolean;
+  topSpeed?: number;
+  avgSpeed?: number;
+  stalls?: number;
 }
 
 @Injectable()
@@ -34,6 +37,7 @@ export class RacesService {
     isPrivate: boolean,
     roomCode: string | undefined,
     standings: FinalPlayerResult[],
+    gameId: string = 'classic-race',
   ) {
     const humanPlayerIds = standings
       .filter((s) => !s.isBot && s.userId)
@@ -41,6 +45,7 @@ export class RacesService {
 
     const race = new this.raceModel({
       mode,
+      gameId: gameId || 'classic-race',
       textId,
       playerIds: humanPlayerIds,
       startedAt,
@@ -53,12 +58,16 @@ export class RacesService {
     for (const standing of standings) {
       const result = new this.raceResultModel({
         raceId: savedRace._id,
+        gameId: gameId || 'classic-race',
         userId: standing.userId,
         isBot: standing.isBot,
         position: standing.position,
         wpm: standing.wpm,
         accuracy: standing.accuracy,
         errors: standing.errors,
+        topSpeed: standing.topSpeed ?? null,
+        avgSpeed: standing.avgSpeed ?? null,
+        stalls: standing.stalls ?? null,
         flagged: standing.flagged,
         reviewStatus: standing.flagged ? 'pending' : 'none',
         flaggedReason: standing.flagged ? 'Anti-cheat threshold flagged' : null,

@@ -14,6 +14,10 @@ export const DEFAULT_SETTINGS = {
   botsEnabled: true,
   registrationEnabled: true,
   maintenanceMode: false,
+  carRace: {
+    stallPenaltyMs: 400,
+    idleTimeoutMs: 1000,
+  },
 };
 
 @Injectable()
@@ -40,6 +44,9 @@ export class SettingsService implements OnModuleInit {
         this.logger.log('Initialized default game settings in database.');
       }
       this.cachedSettings = doc.toObject();
+      if (!this.cachedSettings.carRace) {
+        this.cachedSettings.carRace = { ...DEFAULT_SETTINGS.carRace };
+      }
       return this.cachedSettings;
     } catch (err: any) {
       this.logger.error(`Error loading game settings: ${err.message}`);
@@ -78,6 +85,12 @@ export class SettingsService implements OnModuleInit {
     }
     if (dto.maxProgressJumpPerTick !== undefined && (dto.maxProgressJumpPerTick < 5 || dto.maxProgressJumpPerTick > 50)) {
       throw new BadRequestException('maxProgressJumpPerTick must be between 5 and 50');
+    }
+    if (dto.carRace?.stallPenaltyMs !== undefined && (dto.carRace.stallPenaltyMs < 100 || dto.carRace.stallPenaltyMs > 2000)) {
+      throw new BadRequestException('carRace.stallPenaltyMs must be between 100 and 2000 ms');
+    }
+    if (dto.carRace?.idleTimeoutMs !== undefined && (dto.carRace.idleTimeoutMs < 200 || dto.carRace.idleTimeoutMs > 5000)) {
+      throw new BadRequestException('carRace.idleTimeoutMs must be between 200 and 5000 ms');
     }
 
     let doc = await this.settingsModel.findOne().exec();

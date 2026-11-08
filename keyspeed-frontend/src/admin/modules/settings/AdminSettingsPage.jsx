@@ -7,6 +7,7 @@ import {
   Power,
   RotateCcw,
   Save,
+  Gauge,
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useToast } from '../../components/ToastContext';
@@ -32,6 +33,10 @@ export default function AdminSettingsPage() {
     botsEnabled: true,
     registrationEnabled: true,
     maintenanceMode: false,
+    carRace: {
+      stallPenaltyMs: 400,
+      idleTimeoutMs: 1000,
+    },
   });
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -48,12 +53,27 @@ export default function AdminSettingsPage() {
         botsEnabled: remoteSettings.botsEnabled ?? true,
         registrationEnabled: remoteSettings.registrationEnabled ?? true,
         maintenanceMode: remoteSettings.maintenanceMode ?? false,
+        carRace: {
+          stallPenaltyMs: remoteSettings.carRace?.stallPenaltyMs ?? 400,
+          idleTimeoutMs: remoteSettings.carRace?.idleTimeoutMs ?? 1000,
+        },
       });
     }
   }, [remoteSettings]);
 
   const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    if (field.startsWith('carRace.')) {
+      const key = field.split('.')[1];
+      setForm((prev) => ({
+        ...prev,
+        carRace: {
+          ...prev.carRace,
+          [key]: value,
+        },
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSave = async (e) => {
@@ -240,7 +260,59 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Card 3: Platform & Operation Flags */}
+        {/* Card 3: Car Race Specific Settings */}
+        <div className="p-6 rounded-2xl bg-surface border border-border shadow-card space-y-4 lg:col-span-2">
+          <div className="flex items-center gap-2 pb-3 border-b border-border">
+            <Gauge className="w-4 h-4 text-accent" />
+            <h3 className="text-sm font-bold text-fg">Car Race GP Simulation Rules</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            <div>
+              <div className="flex justify-between font-semibold text-fg/80 mb-1">
+                <span>Stall Penalty Duration:</span>
+                <span className="font-mono text-danger font-bold">
+                  {form.carRace?.stallPenaltyMs ?? 400} ms
+                </span>
+              </div>
+              <input
+                type="range"
+                min={100}
+                max={1500}
+                step={50}
+                value={form.carRace?.stallPenaltyMs ?? 400}
+                onChange={(e) => handleChange('carRace.stallPenaltyMs', Number(e.target.value))}
+                className="w-full accent-accent cursor-pointer"
+              />
+              <p className="text-[11px] text-fg/50 mt-1">
+                Extra delay after correcting a typo with Backspace before the racing car can accelerate again.
+              </p>
+            </div>
+
+            <div>
+              <div className="flex justify-between font-semibold text-fg/80 mb-1">
+                <span>Idle Deceleration Timeout:</span>
+                <span className="font-mono text-accent font-bold">
+                  {form.carRace?.idleTimeoutMs ?? 1000} ms
+                </span>
+              </div>
+              <input
+                type="range"
+                min={300}
+                max={3000}
+                step={100}
+                value={form.carRace?.idleTimeoutMs ?? 1000}
+                onChange={(e) => handleChange('carRace.idleTimeoutMs', Number(e.target.value))}
+                className="w-full accent-accent cursor-pointer"
+              />
+              <p className="text-[11px] text-fg/50 mt-1">
+                Inactivity threshold before the car decelerates quickly to a stop (engine state: idle).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Platform & Operation Flags */}
         <div className="p-6 rounded-2xl bg-surface border border-border shadow-card space-y-4 lg:col-span-2">
           <div className="flex items-center gap-2 pb-3 border-b border-border">
             <Power className="w-4 h-4 text-accent" />

@@ -24,12 +24,14 @@ export default function FlaggedListPage() {
   const toast = useToast();
   const { page, setPage, limit, setLimit, filters, setFilter, resetFilters } = useTableState({
     status: 'pending',
+    gameId: 'all',
   });
 
   const { data, isLoading } = useGetFlaggedQuery({
     page,
     limit,
     status: filters.status,
+    gameId: filters.gameId,
   });
 
   const [approveResult] = useApproveFlaggedMutation();
@@ -136,6 +138,15 @@ export default function FlaggedListPage() {
       ),
     },
     {
+      key: 'gameId',
+      label: 'Game',
+      render: (_, r) => (
+        <span className="text-xs font-mono font-bold text-fg">
+          {r.gameId === 'car-race' ? '🏎️ Car Race' : '🏁 Classic'}
+        </span>
+      ),
+    },
+    {
       key: 'flaggedReason',
       label: 'Detection Reason',
       render: (reason) => (
@@ -226,6 +237,17 @@ export default function FlaggedListPage() {
 
       {/* Filter Bar */}
       <FilterBar onReset={resetFilters}>
+        {/* Game Filter */}
+        <select
+          value={filters.gameId}
+          onChange={(e) => setFilter('gameId', e.target.value)}
+          className="px-3 py-1.5 rounded-lg bg-surface border border-border text-fg text-xs focus:outline-none focus:border-accent cursor-pointer"
+        >
+          <option value="all">All Games</option>
+          <option value="classic-race">Classic Race</option>
+          <option value="car-race">Car Race</option>
+        </select>
+
         <div className="flex items-center gap-1.5">
           {['pending', 'approved', 'rejected', 'all'].map((st) => (
             <button

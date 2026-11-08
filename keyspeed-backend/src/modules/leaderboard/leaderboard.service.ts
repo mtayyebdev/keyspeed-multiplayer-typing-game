@@ -10,12 +10,21 @@ export class LeaderboardService {
     private raceResultModel: Model<RaceResultDocument>,
   ) {}
 
-  async getLeaderboard(scope: 'daily' | 'alltime' = 'alltime') {
+  async getLeaderboard(
+    scope: 'daily' | 'alltime' = 'alltime',
+    gameId: string = 'classic-race',
+  ) {
     const matchFilter: any = {
       isBot: false,
       flagged: false,
       userId: { $ne: null },
     };
+
+    if (gameId === 'classic-race') {
+      matchFilter.$or = [{ gameId: 'classic-race' }, { gameId: { $exists: false } }];
+    } else {
+      matchFilter.gameId = gameId;
+    }
 
     if (scope === 'daily') {
       const startOfDay = new Date();

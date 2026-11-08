@@ -3,6 +3,16 @@ import { Document } from 'mongoose';
 
 export type SettingsDocument = Settings & Document;
 
+@Schema({ _id: false })
+export class CarRaceSettings {
+  @Prop({ default: 400, min: 100, max: 2000 })
+  stallPenaltyMs: number;
+
+  @Prop({ default: 1000, min: 200, max: 5000 })
+  idleTimeoutMs: number;
+}
+export const CarRaceSettingsSchema = SchemaFactory.createForClass(CarRaceSettings);
+
 @Schema({ timestamps: true })
 export class Settings {
   @Prop({ default: 8, min: 1, max: 60 })
@@ -31,6 +41,12 @@ export class Settings {
 
   @Prop({ default: false })
   maintenanceMode: boolean;
+
+  @Prop({
+    type: CarRaceSettingsSchema,
+    default: () => ({ stallPenaltyMs: 400, idleTimeoutMs: 1000 }),
+  })
+  carRace: CarRaceSettings;
 }
 
 export const SettingsSchema = SchemaFactory.createForClass(Settings);

@@ -85,6 +85,8 @@ export const socketMiddleware = (store) => (next) => (action) => {
               roomCode: data.roomCode,
               hostId: data.hostId,
               isHost: amIHost,
+              gameId: data.gameId,
+              gameConfig: data.gameConfig,
               players: data.players,
             })
           );
@@ -94,6 +96,8 @@ export const socketMiddleware = (store) => (next) => (action) => {
               players: data.players,
               hostId: data.hostId,
               isHost: amIHost,
+              gameId: data.gameId,
+              gameConfig: data.gameConfig,
             })
           );
         }
@@ -156,7 +160,8 @@ export const socketMiddleware = (store) => (next) => (action) => {
 
     case 'socket/queueJoin': {
       if (socket?.connected) {
-        socket.emit('queue:join');
+        const gameId = action.payload?.gameId || store.getState().race.gameId || 'classic-race';
+        socket.emit('queue:join', { gameId });
       }
       break;
     }
@@ -170,7 +175,9 @@ export const socketMiddleware = (store) => (next) => (action) => {
 
     case 'socket/roomCreate': {
       if (socket?.connected) {
-        socket.emit('room:create');
+        const gameId = action.payload?.gameId || store.getState().race.gameId || 'classic-race';
+        const isPrivate = action.payload?.isPrivate ?? true;
+        socket.emit('room:create', { gameId, isPrivate });
       }
       break;
     }

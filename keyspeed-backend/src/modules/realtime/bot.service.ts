@@ -24,12 +24,18 @@ export interface BotPlayer {
   accuracy: number;
   errors?: number;
   targetWpm: number;
+  avgWpm?: number;
   charsTyped: number;
   finished: boolean;
   position?: number;
   durationMs?: number;
   rankScore?: number;
   intervalTimer?: NodeJS.Timeout;
+  speed?: number;
+  state?: 'running' | 'stalled' | 'idle' | 'finished';
+  topSpeed?: number;
+  avgSpeed?: number;
+  stalls?: number;
 }
 
 @Injectable()

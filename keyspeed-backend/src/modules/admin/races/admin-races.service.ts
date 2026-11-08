@@ -11,6 +11,7 @@ export interface AdminRacesQuery {
   page?: number;
   limit?: number;
   mode?: string;
+  gameId?: string;
   startDate?: string;
   endDate?: string;
   isPrivate?: string;
@@ -37,6 +38,14 @@ export class AdminRacesService {
 
     if (query.mode && query.mode !== 'all') {
       filter.mode = query.mode;
+    }
+
+    if (query.gameId && query.gameId !== 'all') {
+      if (query.gameId === 'classic-race') {
+        filter.$or = [{ gameId: 'classic-race' }, { gameId: { $exists: false } }];
+      } else {
+        filter.gameId = query.gameId;
+      }
     }
 
     if (query.isPrivate !== undefined && query.isPrivate !== 'all') {

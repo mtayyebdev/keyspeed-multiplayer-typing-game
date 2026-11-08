@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { resetRace } from '../features/race/raceSlice';
+import { motion, AnimatePresence } from 'framer-motion';
+import { resetRace, setSelectedGame } from '../features/race/raceSlice';
+import { getAllGames, getGame } from '../features/games/registry';
 import {
   Users,
   Play,
@@ -12,8 +14,10 @@ import {
   Bot,
   User,
   ArrowRight,
-  LogOut,
+  ArrowLeft,
   AlertCircle,
+  Radio,
+  Gamepad2,
 } from 'lucide-react';
 
 export default function LobbyPage() {
@@ -24,6 +28,7 @@ export default function LobbyPage() {
     status,
     roomId,
     roomCode,
+    gameId,
     isHost: sliceIsHost,
     hostId,
     socketId,
@@ -35,59 +40,75 @@ export default function LobbyPage() {
   const hostPlayer = players.find((p) => p.isHost || (hostId && p.id === hostId));
   const isHost = Boolean(
     sliceIsHost ||
-    (hostId && socketId && hostId === socketId) ||
-    (hostPlayer && socketId && hostPlayer.id === socketId) ||
-    (hostPlayer && user?.username && hostPlayer.username === user.username) ||
-    (hostPlayer && (user?.id || user?._id) && (hostPlayer.userId === user?.id || hostPlayer.userId === user?._id))
+      (hostId && socketId && hostId === socketId) ||
+      (hostPlayer && socketId && hostPlayer.id === socketId) ||
+      (hostPlayer && user?.username && hostPlayer.username === user.username) ||
+      (hostPlayer &&
+        (user?.id || user?._id) &&
+        (hostPlayer.userId === user?.id || hostPlayer.userId === user?._id))
   );
 
+  // 3-step state: 1 = Choose Mode, 2 = Choose Game, 3 = Start / Lobby / Queue
+  const [step, setStep] = useState(1);
+  const [selectedMode, setSelectedMode] = useState(null); // 'queue' | 'room'
+  const [activeGameId, setActiveGameId] = useState(gameId || 'classic-race');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
-  const [isJoiningQueue, setIsJoiningQueue] = useState(false);
 
-  // Navigate to race page when game is ready or countdown begins
+  // Sync step with Redux race status
   useEffect(() => {
     if (status === 'ready' || status === 'countdown' || status === 'racing') {
       navigate('/race');
-    }
-    if (status !== 'idle') {
-      setIsJoiningQueue(false);
+    } else if (status === 'lobby' || status === 'queuing') {
+      setStep(3);
     }
   }, [status, navigate]);
 
-  useEffect(() => {
-    if (error) {
-      setIsJoiningQueue(false);
+  const allGames = getAllGames();
+  const currentGame = getGame(activeGameId);
+
+  // Mode Selection Handlers
+  const handleSelectMode = (mode) => {
+    setSelectedMode(mode);
+    setStep(2);
+  };
+
+  // Game Selection Handler
+  const handleSelectGame = (gId) => {
+    setActiveGameId(gId);
+    dispatch(setSelectedGame(gId));
+
+    if (selectedMode === 'queue') {
+      dispatch({ type: 'socket/queueJoin', payload: { gameId: gId } });
+      setStep(3);
+    } else if (selectedMode === 'room') {
+      dispatch({ type: 'socket/roomCreate', payload: { gameId: gId, isPrivate: true } });
+      setStep(3);
     }
-  }, [error]);
-
-  const handleJoinQueue = () => {
-    setIsJoiningQueue(true);
-    dispatch({ type: 'socket/queueJoin' });
   };
 
-  const handleLeaveQueue = () => {
-    dispatch({ type: 'socket/queueLeave' });
-    dispatch(resetRace());
-  };
-
-  const handleCreateRoom = () => {
-    dispatch({ type: 'socket/roomCreate' });
-  };
-
+  // Direct Join by Code
   const handleJoinByCode = (e) => {
     e.preventDefault();
     if (!joinCodeInput.trim()) return;
     dispatch({ type: 'socket/roomJoin', payload: joinCodeInput.trim().toUpperCase() });
+    setStep(3);
   };
 
-  const handleStartRoom = () => {
-    dispatch({ type: 'socket/roomStart', payload: { roomId, roomCode } });
+  const handleCancelQueue = () => {
+    dispatch({ type: 'socket/queueLeave' });
+    dispatch(resetRace());
+    setStep(2);
   };
 
   const handleLeaveRoom = () => {
     dispatch({ type: 'socket/roomLeave', payload: { roomId, roomCode } });
     dispatch(resetRace());
+    setStep(1);
+  };
+
+  const handleStartRoom = () => {
+    dispatch({ type: 'socket/roomStart', payload: { roomId, roomCode } });
   };
 
   const copyRoomCode = () => {
@@ -98,19 +119,28 @@ export default function LobbyPage() {
     }
   };
 
+  // Step transition animations
+  const stepVariants = {
+    initial: { opacity: 0, y: 15 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+    exit: { opacity: 0, y: -15, transition: { duration: 0.2 } },
+  };
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full py-8">
-      {/* Heading */}
-      <div className="text-center mb-8">
+    <div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full py-8 px-4">
+      {/* Header */}
+      <div className="text-center mb-6">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-fg tracking-tight">
-          Multiplayer Race <span className="text-accent">Lobby</span>
+          Live Race <span className="text-accent">Paddock</span>
         </h1>
         <p className="text-sm text-fg/60 mt-1">
-          Compete against players worldwide or race with friends in private rooms
+          {step === 1 && 'Step 1 of 3: Choose your matchmaking destination'}
+          {step === 2 && 'Step 2 of 3: Select your racing discipline'}
+          {step === 3 && (status === 'queuing' ? 'Step 3 of 3: Matchmaking in progress' : 'Step 3 of 3: Room lobby grid')}
         </p>
       </div>
 
-      {/* Error notice */}
+      {/* Error Notice */}
       {error && (
         <div className="w-full max-w-md mb-6 p-4 rounded-2xl bg-danger-soft border border-danger/30 text-danger text-xs flex items-center gap-2.5 shadow-card">
           <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
@@ -118,207 +148,364 @@ export default function LobbyPage() {
         </div>
       )}
 
-      {/* QUEUE WAITING STATE */}
-      {status === 'queuing' ? (
-        <div className="w-full max-w-md rounded-2xl p-8 border border-border bg-surface shadow-card text-center flex flex-col items-center">
-          <div className="w-14 h-14 rounded-2xl bg-accent-soft text-accent border border-accent/20 flex items-center justify-center mb-4 shadow-sm">
-            <Loader2 className="w-7 h-7 text-accent animate-spin" />
-          </div>
-          <h2 className="text-xl font-bold text-fg mb-1">Searching for Opponents...</h2>
-          <p className="text-xs text-fg/60 max-w-xs mb-6">
-            Connecting you to an active match. If no players join within 8 seconds, bots will backfill automatically.
-          </p>
-
-          <button
-            onClick={handleLeaveQueue}
-            className="btn-secondary text-xs py-2.5 px-6 shadow-sm"
+      {/* Stepper Flow Container */}
+      <AnimatePresence mode="wait">
+        {/* ================= STEP 1: CHOOSE MODE ================= */}
+        {step === 1 && (
+          <motion.div
+            key="step-1"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="w-full flex flex-col gap-6"
           >
-            Cancel Matchmaking
-          </button>
-        </div>
-      ) : status === 'lobby' && roomCode ? (
-        /* PRIVATE ROOM LOBBY STATE */
-        <div className="w-full max-w-lg rounded-2xl p-8 border border-border bg-surface shadow-card">
-          {/* Room Header */}
-          <div className="flex items-center justify-between pb-6 mb-6 border-b border-border">
-            <div>
-              <span className="text-xs uppercase font-bold tracking-widest text-accent">
-                Private Room
-              </span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-black font-mono tracking-widest text-fg">
-                  {roomCode}
-                </span>
-                <button
-                  onClick={copyRoomCode}
-                  className="p-1.5 rounded-lg border border-border bg-bg hover:bg-surface-hover text-fg transition-all duration-150 cursor-pointer shadow-sm active:scale-95"
-                  title="Copy code"
-                  aria-label="Copy room code"
-                >
-                  {copiedCode ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="text-right">
-              <span className="text-xs text-fg/60 block font-medium">Racers</span>
-              <span className="text-lg font-bold text-accent font-mono">
-                {players.length} / 4
-              </span>
-            </div>
-          </div>
-
-          {/* Racers list in private room */}
-          <div className="space-y-2.5 mb-8">
-            <div className="text-xs font-semibold uppercase text-fg/70 tracking-wider mb-2">
-              Racers in Room
-            </div>
-            {players.map((p, idx) => (
-              <div
-                key={p.id || idx}
-                className="flex items-center justify-between p-3 rounded-xl bg-bg border border-border"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-surface border border-border text-fg flex items-center justify-center font-bold text-xs">
-                    {p.isBot ? <Bot className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
-                  </div>
-                  <span className="text-sm font-semibold text-fg">{p.username}</span>
-                  {p.isHost && (
-                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-accent text-bg shadow-sm">
-                      HOST
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-accent font-semibold bg-accent-soft px-2 py-0.5 rounded border border-accent/20">Ready</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Host Controls */}
-          {isHost ? (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {/* Option A: Public Matchmaking */}
               <button
-                onClick={handleStartRoom}
-                disabled={players.length < 2}
-                className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm transition-all duration-150 flex items-center justify-center gap-2 shadow-sm ${
-                  players.length >= 2
-                    ? 'bg-accent text-bg hover:bg-accent-hover hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer'
-                    : 'bg-surface text-fg/40 border border-border cursor-not-allowed opacity-60'
-                }`}
+                onClick={() => handleSelectMode('queue')}
+                className="group relative flex flex-col items-start p-6 rounded-3xl bg-surface border-2 border-border hover:border-accent hover:bg-surface-hover text-left transition-all duration-200 cursor-pointer shadow-card active:scale-[0.98]"
               >
-                <Play className="w-4 h-4 fill-current" />
-                <span>
-                  {players.length >= 2
-                    ? `Start Race Now (${players.length} Racers Ready)`
-                    : 'Need Minimum 2 Racers to Start'}
-                </span>
+                <div className="w-12 h-12 rounded-2xl bg-accent-soft border border-accent/40 text-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Play className="w-6 h-6 fill-current" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-fg">Join Public Queue</h3>
+                  <span className="text-[10px] font-mono uppercase font-extrabold px-2 py-0.5 rounded-full bg-accent-soft text-accent border border-accent/30">
+                    Instant
+                  </span>
+                </div>
+                <p className="text-xs text-fg/70 mt-2 leading-relaxed">
+                  Enter matchmaking to race against live players worldwide. If no opponents join within seconds, smart AI bots fill the empty grid.
+                </p>
+                <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-accent">
+                  <span>Continue to game select</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
               </button>
 
-              <div className="text-center text-[11px] text-fg/60">
-                {players.length < 2 ? (
-                  <span>Share your 6-character room code with a friend to begin.</span>
-                ) : players.length < 4 ? (
-                  <span>You can start now with {players.length} racers, or wait for up to 4 players (game starts automatically at 4).</span>
-                ) : (
-                  <span className="text-accent font-semibold animate-pulse">Room full (4 racers)! Launching race automatically...</span>
-                )}
+              {/* Option B: Create Private Room */}
+              <button
+                onClick={() => handleSelectMode('room')}
+                className="group relative flex flex-col items-start p-6 rounded-3xl bg-surface border-2 border-border hover:border-accent hover:bg-surface-hover text-left transition-all duration-200 cursor-pointer shadow-card active:scale-[0.98]"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-surface-hover border border-border text-fg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-fg">Create Room</h3>
+                  <span className="text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-surface border border-border text-fg/70">
+                    Host
+                  </span>
+                </div>
+                <p className="text-xs text-fg/70 mt-2 leading-relaxed">
+                  Host a custom multiplayer room with a unique 6-character room code. Share the code with friends and start when ready.
+                </p>
+                <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-accent">
+                  <span>Set up room & choose game</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </button>
+            </div>
+
+            {/* Direct Join by Room Code Box */}
+            <div className="w-full bg-surface border border-border rounded-2xl p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-bg border border-border flex items-center justify-center text-accent">
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-fg">Have a friend's room code?</h4>
+                    <p className="text-xs text-fg/60">Enter the 6-character room code to join their lobby directly</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleJoinByCode} className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    placeholder="CODE"
+                    maxLength={6}
+                    className="w-full sm:w-32 px-3 py-2 bg-bg border border-border rounded-xl text-center font-mono font-bold tracking-widest text-fg text-sm uppercase focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!joinCodeInput.trim()}
+                    className="py-2 px-4 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                  >
+                    Join
+                  </button>
+                </form>
               </div>
             </div>
-          ) : (
-            <div className="text-center p-3.5 rounded-xl bg-bg border border-border text-xs text-fg/70 font-medium">
-              {players.length < 2
-                ? 'Waiting for more racers to join (minimum 2)...'
-                : players.length >= 4
-                ? 'Room full! Starting game...'
-                : 'Ready! Waiting for host to start the race...'}
-            </div>
-          )}
+          </motion.div>
+        )}
 
-          <div className="mt-4 text-center">
-            <button
-              onClick={handleLeaveRoom}
-              className="text-xs text-fg/60 hover:text-danger hover:bg-danger-soft px-3 py-1.5 rounded-lg transition-all duration-150 flex items-center justify-center gap-1 mx-auto cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Leave Room</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* DEFAULT LOBBY MODE SELECT */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
-          {/* Public Quick Race Card */}
-          <div className="rounded-2xl p-6 sm:p-8 border border-border bg-surface shadow-card flex flex-col justify-between hover:border-strong hover:bg-surface-hover transition-all duration-150">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-accent-soft text-accent border border-accent/20 flex items-center justify-center mb-4 shadow-sm">
-                <Play className="w-6 h-6 fill-current" />
+        {/* ================= STEP 2: CHOOSE GAME ================= */}
+        {step === 2 && (
+          <motion.div
+            key="step-2"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="w-full flex flex-col gap-5"
+          >
+            {/* Top Bar with Back Button */}
+            <div className="flex items-center justify-between w-full">
+              <button
+                onClick={() => setStep(1)}
+                className="flex items-center gap-1.5 text-xs text-fg/70 hover:text-fg py-1.5 px-3 rounded-xl bg-surface border border-border hover:bg-surface-hover cursor-pointer shadow-sm active:scale-95 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Mode</span>
+              </button>
+
+              <span className="text-xs font-mono font-bold uppercase text-accent">
+                Mode: {selectedMode === 'queue' ? 'Public Queue' : 'Private Room'}
+              </span>
+            </div>
+
+            {/* Game Selection Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {allGames.map((game) => {
+                const IconComponent = game.icon || Gamepad2;
+                const isSelected = activeGameId === game.id;
+
+                return (
+                  <button
+                    key={game.id}
+                    onClick={() => handleSelectGame(game.id)}
+                    className={`group relative flex flex-col p-6 rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer shadow-card active:scale-[0.98] ${
+                      isSelected
+                        ? 'bg-surface border-accent ring-2 ring-accent/30'
+                        : 'bg-surface border-border hover:border-accent/60 hover:bg-surface-hover'
+                    }`}
+                  >
+                    {/* Badge */}
+                    <div className="flex items-center justify-between w-full mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-accent-soft border border-accent/40 text-accent flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <IconComponent className="w-6 h-6" />
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-mono uppercase font-black px-2.5 py-0.5 rounded-full border ${
+                          game.badge === 'New'
+                            ? 'bg-accent text-bg border-accent'
+                            : 'bg-bg text-fg/80 border-border'
+                        }`}
+                      >
+                        {game.badge}
+                      </span>
+                    </div>
+
+                    <h3 className="text-xl font-bold text-fg flex items-center gap-2">
+                      {game.name}
+                    </h3>
+
+                    <p className="text-xs text-fg/70 mt-2 leading-relaxed flex-1">
+                      {game.shortDescription}
+                    </p>
+
+                    <div className="mt-5 pt-3 border-t border-border w-full flex items-center justify-between text-xs font-mono">
+                      <span className="text-fg/60">
+                        {game.minPlayers} - {game.maxPlayers} Racers
+                      </span>
+                      <span className="text-accent font-bold group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                        Select Game <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ================= STEP 3: START (LOBBY OR QUEUE) ================= */}
+        {step === 3 && (
+          <motion.div
+            key="step-3"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="w-full flex flex-col items-center gap-6"
+          >
+            {/* Case A: Searching for Players in Public Queue */}
+            {status === 'queuing' ? (
+              <div className="w-full max-w-lg bg-surface border-2 border-border-strong rounded-3xl p-8 shadow-card flex flex-col items-center text-center gap-5">
+                <div className="relative w-20 h-20 rounded-full bg-accent-soft border-2 border-accent/40 flex items-center justify-center text-accent">
+                  <Radio className="w-10 h-10 animate-pulse text-accent" />
+                  <div className="absolute inset-0 rounded-full border border-accent animate-ping opacity-40 pointer-events-none" />
+                </div>
+
+                <div>
+                  <h3 className="text-2xl font-black text-fg tracking-tight">
+                    Searching for Racers...
+                  </h3>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-2 rounded-full bg-bg border border-border text-xs font-mono font-bold text-accent">
+                    <span>Discipline:</span>
+                    <span>{currentGame.name}</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-fg/70 max-w-sm leading-relaxed">
+                  Searching for opponents matching your pace. If no live players enter within a few moments, AI racers will backfill to start the race countdown.
+                </p>
+
+                <div className="w-full pt-4 border-t border-border flex items-center justify-center">
+                  <button
+                    onClick={handleCancelQueue}
+                    className="py-2.5 px-6 rounded-xl bg-danger-soft border border-danger/30 text-danger text-xs font-mono font-bold hover:bg-danger/20 transition-all cursor-pointer active:scale-95 shadow-sm"
+                  >
+                    Cancel Matchmaking
+                  </button>
+                </div>
               </div>
-              <h2 className="text-xl font-bold text-fg mb-2">Public Quick Race</h2>
-              <p className="text-xs text-fg/60 leading-relaxed mb-6">
-                Jump into the public matchmaking queue. Race 2 to 4 players with synchronized starts and bot fallback.
-              </p>
-            </div>
+            ) : (
+              /* Case B: Room Lobby (Created or Joined) */
+              <div className="w-full max-w-2xl bg-surface border-2 border-border-strong rounded-3xl p-6 sm:p-8 shadow-card flex flex-col gap-6">
+                {/* Lobby Header & Room Code Display */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-5 border-b border-border">
+                  <div className="text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <h3 className="text-xl font-bold text-fg">Race Room Lobby</h3>
+                      <span className="text-[10px] font-mono font-black uppercase px-2.5 py-0.5 rounded-full bg-accent-soft text-accent border border-accent/30">
+                        {currentGame.name}
+                      </span>
+                    </div>
+                    <p className="text-xs text-fg/60 mt-0.5">
+                      Share the code below with your racing crew
+                    </p>
+                  </div>
 
-            <button
-              onClick={handleJoinQueue}
-              disabled={isJoiningQueue || status === 'queuing'}
-              className="w-full py-3 px-5 rounded-xl bg-accent text-bg font-bold text-sm hover:bg-accent-hover hover:-translate-y-[1px] active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none transition-all duration-150 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-            >
-              {isJoiningQueue || status === 'queuing' ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-bg" />
-                  <span>Entering Queue...</span>
-                </>
-              ) : (
-                <>
-                  <Users className="w-4 h-4" />
-                  <span>Join Public Queue</span>
-                </>
-              )}
-            </button>
-          </div>
+                  {/* 6-Character Room Code with Copy Button */}
+                  {roomCode && (
+                    <div className="flex items-center gap-2 bg-bg px-4 py-2 rounded-2xl border-2 border-border-strong shadow-sm">
+                      <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-accent">
+                        {roomCode}
+                      </span>
+                      <button
+                        onClick={copyRoomCode}
+                        className="p-1.5 rounded-lg bg-surface border border-border hover:bg-surface-hover text-fg/70 hover:text-fg active:scale-95 transition-all cursor-pointer"
+                        title="Copy Room Code"
+                      >
+                        {copiedCode ? (
+                          <Check className="w-4 h-4 text-accent" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-          {/* Private Room Card */}
-          <div className="rounded-2xl p-6 sm:p-8 border border-border bg-surface shadow-card flex flex-col justify-between hover:border-strong hover:bg-surface-hover transition-all duration-150">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-accent-soft text-accent border border-accent/20 flex items-center justify-center mb-4 shadow-sm">
-                <KeyRound className="w-6 h-6" />
+                {/* Racer Grid (Slots 1 to 4) */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-fg/70">
+                      Starting Grid ({players.length} / 4)
+                    </span>
+                    <span className="text-[11px] text-fg/50 font-mono">Min 2 to start</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[0, 1, 2, 3].map((slotIdx) => {
+                      const player = players[slotIdx];
+
+                      if (player) {
+                        const isMe =
+                          (socketId && player.id === socketId) ||
+                          (user?.username && player.username === user.username);
+
+                        return (
+                          <div
+                            key={player.id || slotIdx}
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+                              isMe
+                                ? 'bg-accent-soft/40 border-accent/50 text-fg'
+                                : 'bg-bg border-border text-fg'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                                  player.isHost
+                                    ? 'bg-accent text-bg font-bold'
+                                    : 'bg-surface border border-border text-fg'
+                                }`}
+                              >
+                                {player.isBot ? (
+                                  <Bot className="w-4 h-4" />
+                                ) : (
+                                  <User className="w-4 h-4" />
+                                )}
+                              </div>
+                              <div>
+                                <span className="font-bold text-sm block leading-tight truncate max-w-[140px]">
+                                  {player.username}
+                                  {isMe ? ' (You)' : ''}
+                                </span>
+                                <span className="text-[10px] font-mono text-fg/60">
+                                  {player.isHost ? 'Host' : 'Racer'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {player.isHost && (
+                              <span className="text-[10px] font-mono font-bold text-accent px-2 py-0.5 rounded-full bg-accent-soft border border-accent/30">
+                                HOST
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={`empty-${slotIdx}`}
+                          className="p-3.5 rounded-2xl border-2 border-dashed border-border/50 bg-bg/40 flex items-center justify-center text-fg/30 text-xs font-mono"
+                        >
+                          Slot {slotIdx + 1} Open
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Host Controls / Waiting Notice */}
+                <div className="pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <button
+                    onClick={handleLeaveRoom}
+                    className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-surface border border-border hover:bg-surface-hover text-fg/70 hover:text-fg text-xs font-mono font-bold transition-all cursor-pointer active:scale-95"
+                  >
+                    Leave Room
+                  </button>
+
+                  {isHost ? (
+                    <button
+                      onClick={handleStartRoom}
+                      disabled={players.length < 2}
+                      className="w-full sm:w-auto py-3 px-8 rounded-xl bg-accent text-bg font-mono font-extrabold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>{players.length < 2 ? 'Need 2+ Players' : 'Start Race'}</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs font-mono text-fg/70">
+                      <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                      <span>Waiting for room host to start...</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h2 className="text-xl font-bold text-fg mb-2">Private Room</h2>
-              <p className="text-xs text-fg/60 leading-relaxed mb-4">
-                Create a private room with a 6-character code or enter a code to race with friends.
-              </p>
-
-              {/* Join with code form */}
-              <form onSubmit={handleJoinByCode} className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  placeholder="6-CHAR CODE"
-                  className="flex-1 px-3 py-2 rounded-xl bg-bg border border-border text-fg font-mono uppercase text-xs tracking-wider placeholder-fg/40 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150"
-                />
-                <button
-                  type="submit"
-                  disabled={joinCodeInput.trim().length < 4}
-                  className="px-4 py-2 rounded-xl bg-accent text-bg font-semibold text-xs hover:bg-accent-hover hover:-translate-y-[1px] active:scale-[0.98] disabled:opacity-50 transition-all duration-150 shadow-sm cursor-pointer"
-                >
-                  Join
-                </button>
-              </form>
-            </div>
-
-            <button
-              onClick={handleCreateRoom}
-              className="w-full py-3 px-5 rounded-xl bg-surface border border-strong text-fg hover:bg-surface-hover hover:border-accent active:scale-[0.98] font-semibold text-sm transition-all duration-150 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-            >
-              <span>Create New Private Room</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

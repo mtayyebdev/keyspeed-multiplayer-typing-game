@@ -16,6 +16,8 @@ import { TextsService } from '../texts/texts.service';
 import { RacesService } from '../races/races.service';
 import { UsersService } from '../users/users.service';
 import { ClassicRaceEngine } from '../../games/classic-race.engine';
+import { CarRaceEngine, CarPlayerRuntime } from '../../games/car-race/car-race.engine';
+import { GameRegistryService } from '../../games/game-registry.service';
 import { BotPlayer, BotService } from './bot.service';
 import { validateProgressJump } from '../../games/anti-cheat.util';
 import { SettingsService } from '../admin/settings/settings.service';
@@ -41,6 +43,8 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly racesService: RacesService,
     private readonly usersService: UsersService,
     private readonly raceEngine: ClassicRaceEngine,
+    private readonly carRaceEngine: CarRaceEngine,
+    private readonly gameRegistryService: GameRegistryService,
     private readonly botService: BotService,
     private readonly settingsService: SettingsService,
   ) {}
@@ -143,7 +147,10 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('queue:join')
-  async handleQueueJoin(@ConnectedSocket() client: Socket) {
+  async handleQueueJoin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data?: { gameId?: string },
+  ) {
     if (!client.data?.user?.sub || client.data?.user?.isGuest) {
       return client.emit('error', {
         code: 'UNAUTHORIZED',
@@ -158,6 +165,8 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message: 'KeySpeed is currently in maintenance mode. Live matchmaking is paused.',
       });
     }
+
+    const targetGameId = data?.gameId || 'classic-race';
 
     const human: HumanPlayer = {
       id: client.id,
@@ -181,6 +190,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       (socketId) => {
         this.server.to(socketId).emit('queue:waiting');
       },
+      targetGameId,
     );
 
     client.join(room.roomId);
@@ -238,7 +248,10 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('room:create')
-  async handleRoomCreate(@ConnectedSocket() client: Socket) {
+  async handleRoomCreate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data?: { gameId?: string; isPrivate?: boolean },
+  ) {
     if (!client.data?.user?.sub || client.data?.user?.isGuest) {
       return client.emit('error', {
         code: 'UNAUTHORIZED',
@@ -249,6 +262,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const code = this.roomService.generateRoomCode();
     const randomText = await this.textsService.getRandomText();
     const roomId = `private_${code}`;
+    const targetGameId = data?.gameId || 'classic-race';
 
     const host: HumanPlayer = {
       id: client.id,
@@ -274,6 +288,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       randomText.content,
       true,
       code,
+      targetGameId,
     );
 
     this.broadcastRoomUpdate(room);
@@ -397,7 +412,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('race:progress')
   handleRaceProgress(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string; index: number },
+    @MessageBody() data: { roomId: string; index: number; hasError?: boolean },
   ) {
     if (!data?.roomId || typeof data.index !== 'number') return;
     const room = this.roomService.getRoom(data.roomId);
@@ -426,16 +441,28 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     player.lastProgressIndex = data.index;
     player.lastProgressUpdate = now;
 
-    // Source of truth: Server calculates progress and WPM
-    const updated = this.raceEngine.calculateProgress(
-      player,
-      data.index,
-      room.text.length,
-      elapsedMs,
-    );
+    if (room.gameId === 'car-race') {
+      const runtime = room.carRuntimes?.get(client.id);
+      if (runtime) {
+        this.carRaceEngine.handleKeystroke(runtime, data.index, !!data.hasError, now);
+        player.progress = runtime.progress;
+        player.speed = runtime.speed;
+        player.state = runtime.state;
+        player.errors = runtime.errors;
+        player.stalls = runtime.stalls;
+      }
+    } else {
+      // Source of truth: Classic race engine calculates progress and WPM
+      const updated = this.raceEngine.calculateProgress(
+        player,
+        data.index,
+        room.text.length,
+        elapsedMs,
+      );
 
-    player.progress = updated.progress;
-    player.wpm = updated.wpm;
+      player.progress = updated.progress;
+      player.wpm = updated.wpm;
+    }
 
     this.broadcastRaceUpdate(room);
   }
@@ -454,27 +481,55 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const now = Date.now();
     const durationMs = Math.max(1000, now - (room.startAt || now));
-
     const settings = this.settingsService.getSettings();
-    const finalScore = this.raceEngine.calculateFinalScore(
-      player,
-      room.text,
-      data.typedText || '',
-      durationMs,
-      settings.maxAllowedWpm || 250,
-      settings.maxProgressJumpPerTick || 15,
-    );
 
-    player.progress = 100;
-    player.wpm = finalScore.wpm;
-    player.netWpm = finalScore.netWpm;
-    player.accuracy = finalScore.accuracy;
-    player.errors = finalScore.errors;
-    player.durationMs = durationMs;
-    if (finalScore.isFlagged) {
-      player.flagged = true;
+    if (room.gameId === 'car-race') {
+      const runtime = room.carRuntimes?.get(client.id) || (player as any);
+      const finalScore = this.carRaceEngine.calculateFinalScore(
+        runtime,
+        room.text,
+        data.typedText || '',
+        durationMs,
+        settings.maxAllowedWpm || 250,
+        settings.maxProgressJumpPerTick || 15,
+      );
+
+      player.progress = 100;
+      player.wpm = finalScore.wpm;
+      player.netWpm = finalScore.netWpm;
+      player.accuracy = finalScore.accuracy;
+      player.errors = finalScore.errors;
+      player.stalls = finalScore.stalls;
+      player.topSpeed = finalScore.topSpeed;
+      player.avgSpeed = finalScore.avgSpeed;
+      player.durationMs = durationMs;
+      player.speed = 0;
+      player.state = 'finished';
+      if (finalScore.isFlagged) {
+        player.flagged = true;
+      }
+      player.finished = true;
+    } else {
+      const finalScore = this.raceEngine.calculateFinalScore(
+        player,
+        room.text,
+        data.typedText || '',
+        durationMs,
+        settings.maxAllowedWpm || 250,
+        settings.maxProgressJumpPerTick || 15,
+      );
+
+      player.progress = 100;
+      player.wpm = finalScore.wpm;
+      player.netWpm = finalScore.netWpm;
+      player.accuracy = finalScore.accuracy;
+      player.errors = finalScore.errors;
+      player.durationMs = durationMs;
+      if (finalScore.isFlagged) {
+        player.flagged = true;
+      }
+      player.finished = true;
     }
-    player.finished = true;
 
     // Notify client of individual finish
     this.server.to(client.id).emit('race:player_finished', {
@@ -483,6 +538,9 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       netWpm: player.netWpm,
       accuracy: player.accuracy,
       errors: player.errors,
+      stalls: player.stalls || 0,
+      topSpeed: player.topSpeed || 0,
+      avgSpeed: player.avgSpeed || 0,
       durationMs,
     });
 
@@ -537,13 +595,22 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       username: p.username,
       progress: 0,
       wpm: 0,
+      speed: 0,
+      state: 'idle',
       isBot: p.isBot,
       isHost: (p as HumanPlayer).isHost || false,
     }));
 
+    const gameConfig = room.gameConfig || {
+      stallPenaltyMs: settings.carRace?.stallPenaltyMs ?? 400,
+      idleTimeoutMs: settings.carRace?.idleTimeoutMs ?? 1000,
+    };
+
     // Broadcast race:ready
     this.server.to(room.roomId).emit('race:ready', {
       roomId: room.roomId,
+      gameId: room.gameId || 'classic-race',
+      gameConfig,
       text: room.text,
       startAt,
       endAt,
@@ -563,13 +630,19 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
         room.status = 'racing';
-        this.startBotSimulation(room);
+
+        if (room.gameId === 'car-race') {
+          this.startCarRaceSimulation(room);
+        } else {
+          this.startBotSimulation(room);
+        }
 
         // Notify room that race has started along with timer info
         this.server.to(room.roomId).emit('race:start', {
           startAt: room.startAt,
           endAt: room.endAt,
           timeLimitSeconds: raceTimeoutSeconds,
+          gameId: room.gameId || 'classic-race',
         });
 
         // Dynamic timeout limit from admin settings
@@ -580,6 +653,95 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }, 1000);
 
     room.countdownTimer = countdownInterval;
+  }
+
+  private startCarRaceSimulation(room: RoomState) {
+    const textLength = Math.max(1, room.text.length);
+    const settings = this.settingsService.getSettings();
+    const stallPenaltyMs = settings.carRace?.stallPenaltyMs ?? 400;
+    const idleTimeoutMs = settings.carRace?.idleTimeoutMs ?? 1000;
+
+    room.carRuntimes = new Map<string, any>();
+
+    for (const [id, player] of room.players) {
+      const targetWpm = player.isBot ? (player as BotPlayer).targetWpm : (player as HumanPlayer).avgWpm;
+      const runtime = this.carRaceEngine.createRuntimePlayer(player, targetWpm);
+      room.carRuntimes.set(id, runtime);
+    }
+
+    const tickMs = 50;
+    room.carRaceTickTimer = setInterval(() => {
+      if (room.status !== 'racing') {
+        if (room.carRaceTickTimer) clearInterval(room.carRaceTickTimer);
+        return;
+      }
+
+      const now = Date.now();
+      const elapsedMs = Math.max(500, now - (room.startAt || now));
+
+      for (const [id, player] of room.players) {
+        const runtime = room.carRuntimes?.get(id);
+        if (!runtime) continue;
+
+        if (player.isBot) {
+          this.carRaceEngine.updateBotTick(runtime, now, textLength, tickMs);
+          player.progress = runtime.progress;
+          player.speed = runtime.speed;
+          player.state = runtime.state;
+          player.stalls = runtime.stalls;
+          player.errors = runtime.errors;
+          player.wpm = Math.max(15, Math.round((runtime.correctChars / 5) / (elapsedMs / 60000)));
+
+          if (runtime.finished && !player.finished) {
+            player.finished = true;
+            player.progress = 100;
+            player.durationMs = elapsedMs;
+            player.speed = 0;
+            player.state = 'finished';
+            const finalScore = this.carRaceEngine.calculateFinalScore(
+              runtime,
+              room.text,
+              room.text,
+              elapsedMs,
+            );
+            player.wpm = finalScore.wpm;
+            player.netWpm = finalScore.netWpm;
+            player.topSpeed = finalScore.topSpeed;
+            player.avgSpeed = finalScore.avgSpeed;
+
+            this.server.to(room.roomId).emit('race:player_finished', {
+              playerId: id,
+              wpm: player.wpm,
+              netWpm: player.netWpm,
+              accuracy: player.accuracy,
+              errors: player.errors,
+              stalls: player.stalls || 0,
+              topSpeed: player.topSpeed || 0,
+              avgSpeed: player.avgSpeed || 0,
+              speed: 0,
+            });
+          }
+        } else {
+          this.carRaceEngine.updateTick(runtime, now, textLength, stallPenaltyMs, idleTimeoutMs);
+          player.progress = runtime.progress;
+          player.speed = runtime.speed;
+          player.state = runtime.state;
+          player.stalls = runtime.stalls;
+          player.errors = runtime.errors;
+          player.wpm = Math.max(0, Math.round((runtime.correctChars / 5) / (elapsedMs / 60000)));
+        }
+      }
+
+      this.broadcastRaceUpdate(room);
+
+      const humans = Array.from(room.players.values()).filter((p) => !p.isBot);
+      const allHumansFinished = humans.length > 0 && humans.every((p) => p.finished);
+      const allPlayersFinished = Array.from(room.players.values()).every((p) => p.finished);
+
+      if (allHumansFinished || allPlayersFinished) {
+        this.finalizeRace(room);
+      }
+    }, tickMs);
   }
 
   private startBotSimulation(room: RoomState) {
@@ -667,6 +829,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     room.status = 'finished';
 
     if (room.botTickTimer) clearInterval(room.botTickTimer);
+    if (room.carRaceTickTimer) clearInterval(room.carRaceTickTimer);
     if (room.raceTimeoutTimer) clearTimeout(room.raceTimeoutTimer);
 
     // Compute fair position rankings for ALL players based on completion, Net WPM, accuracy, and error penalties
@@ -723,11 +886,17 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       netWpm: p.netWpm || p.wpm || 0,
       accuracy: p.accuracy || 100,
       errors: (p as HumanPlayer).errors || 0,
+      stalls: (p as HumanPlayer).stalls || 0,
+      topSpeed: (p as HumanPlayer).topSpeed || 0,
+      avgSpeed: (p as HumanPlayer).avgSpeed || 0,
       flagged: (p as HumanPlayer).flagged || false,
     }));
 
     // Send final standings to all players
-    this.server.to(room.roomId).emit('race:results', { standings: formattedStandings });
+    this.server.to(room.roomId).emit('race:results', {
+      standings: formattedStandings,
+      gameId: room.gameId || 'classic-race',
+    });
 
     // Save to MongoDB
     try {
@@ -739,6 +908,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         room.isPrivate,
         room.roomCode,
         formattedStandings,
+        room.gameId || 'classic-race',
       );
     } catch (err: any) {
       this.logger.error(`Error saving race ${room.roomId} results: ${err.message}`);
@@ -763,6 +933,8 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       roomId: room.roomId,
       roomCode: room.roomCode,
       hostId: room.hostId,
+      gameId: room.gameId || 'classic-race',
+      gameConfig: room.gameConfig || null,
       players,
     });
   }
@@ -773,6 +945,8 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       username: p.username,
       progress: p.progress,
       wpm: p.wpm,
+      speed: p.speed ?? 0,
+      state: p.state ?? (p.finished ? 'finished' : (p.progress > 0 ? 'running' : 'idle')),
       finished: p.finished,
       position: p.position,
     }));

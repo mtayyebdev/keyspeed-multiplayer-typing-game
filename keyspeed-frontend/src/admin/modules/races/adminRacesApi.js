@@ -8,6 +8,7 @@ export const adminRacesApi = baseApi.injectEndpoints({
         if (params.page) searchParams.set('page', params.page);
         if (params.limit) searchParams.set('limit', params.limit);
         if (params.mode && params.mode !== 'all') searchParams.set('mode', params.mode);
+        if (params.gameId && params.gameId !== 'all') searchParams.set('gameId', params.gameId);
         if (params.startDate) searchParams.set('startDate', params.startDate);
         if (params.endDate) searchParams.set('endDate', params.endDate);
         if (params.isPrivate !== undefined && params.isPrivate !== 'all') {

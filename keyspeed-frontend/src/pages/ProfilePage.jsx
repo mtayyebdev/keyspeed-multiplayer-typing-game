@@ -121,6 +121,31 @@ export default function ProfilePage() {
     { label: 'Other Finishes', value: otherFinishes, type: 'error' },
   ];
 
+  const statsByGame = publicData?.statsByGame;
+  const classicResults = results.filter((r) => !r.gameId || r.gameId === 'classic-race');
+  const carResults = results.filter((r) => r.gameId === 'car-race');
+
+  const classicStats = statsByGame?.['classic-race'] || {
+    racesPlayed: classicResults.length || profileUser.racesPlayed || 0,
+    racesWon: classicResults.filter((r) => r.position === 1).length || profileUser.racesWon || 0,
+    avgWpm: profileUser.avgWpm || 0,
+    bestWpm: profileUser.bestWpm || 0,
+  };
+
+  const carStats = statsByGame?.['car-race'] || {
+    racesPlayed: carResults.length || 0,
+    racesWon: carResults.filter((r) => r.position === 1).length || 0,
+    avgWpm:
+      carResults.length > 0
+        ? Math.round(carResults.reduce((a, b) => a + (b.wpm || 0), 0) / carResults.length)
+        : 0,
+    bestWpm: carResults.length > 0 ? Math.max(...carResults.map((r) => r.wpm || 0)) : 0,
+    topSpeed:
+      carResults.length > 0
+        ? Math.max(...carResults.map((r) => r.topSpeed || Math.round((r.wpm || 0) * 2.67)))
+        : 0,
+  };
+
   return (
     <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full py-8">
       {/* Profile Header Card */}
@@ -193,6 +218,65 @@ export default function ProfilePage() {
             </div>
             <div className="text-2xl sm:text-3xl font-black font-mono text-accent">
               {profileUser.racesWon || 0}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Per Game Discipline */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {/* Classic Race Card */}
+        <div className="p-5 rounded-2xl border border-border bg-surface shadow-card flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🏁</span>
+              <h3 className="text-base font-bold text-fg">Classic Race</h3>
+            </div>
+            <span className="text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-accent-soft text-accent border border-accent/30">
+              Classic
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center font-mono">
+            <div className="p-2 rounded-xl bg-bg border border-border">
+              <span className="text-[10px] text-fg/60 block">Races</span>
+              <span className="text-lg font-bold text-fg">{classicStats.racesPlayed}</span>
+            </div>
+            <div className="p-2 rounded-xl bg-bg border border-border">
+              <span className="text-[10px] text-fg/60 block">Victories</span>
+              <span className="text-lg font-bold text-accent">{classicStats.racesWon}</span>
+            </div>
+            <div className="p-2 rounded-xl bg-bg border border-border">
+              <span className="text-[10px] text-fg/60 block">Best WPM</span>
+              <span className="text-lg font-bold text-fg">{classicStats.bestWpm}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Car Race Card */}
+        <div className="p-5 rounded-2xl border border-border bg-surface shadow-card flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🏎️</span>
+              <h3 className="text-base font-bold text-fg">Car Race GP</h3>
+            </div>
+            <span className="text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded-full bg-accent text-bg border border-accent">
+              New
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center font-mono">
+            <div className="p-2 rounded-xl bg-bg border border-border">
+              <span className="text-[10px] text-fg/60 block">Races</span>
+              <span className="text-lg font-bold text-fg">{carStats.racesPlayed}</span>
+            </div>
+            <div className="p-2 rounded-xl bg-bg border border-border">
+              <span className="text-[10px] text-fg/60 block">Victories</span>
+              <span className="text-lg font-bold text-accent">{carStats.racesWon}</span>
+            </div>
+            <div className="p-2 rounded-xl bg-bg border border-border">
+              <span className="text-[10px] text-fg/60 block">Top Speed</span>
+              <span className="text-lg font-bold text-accent">
+                {carStats.topSpeed ? `${carStats.topSpeed} km/h` : `${Math.round(carStats.bestWpm * 2.67)} km/h`}
+              </span>
             </div>
           </div>
         </div>

@@ -15,7 +15,7 @@ export class AdminFlaggedService {
     private readonly adminUsersService: AdminUsersService,
   ) {}
 
-  async findAll(query: { page?: number; limit?: number; status?: string }) {
+  async findAll(query: { page?: number; limit?: number; status?: string; gameId?: string }) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
     const skip = (page - 1) * limit;
@@ -23,6 +23,13 @@ export class AdminFlaggedService {
     const filter: any = { flagged: true };
     if (query.status && query.status !== 'all') {
       filter.reviewStatus = query.status;
+    }
+    if (query.gameId && query.gameId !== 'all') {
+      if (query.gameId === 'classic-race') {
+        filter.$or = [{ gameId: 'classic-race' }, { gameId: { $exists: false } }];
+      } else {
+        filter.gameId = query.gameId;
+      }
     }
 
     const [results, total] = await Promise.all([

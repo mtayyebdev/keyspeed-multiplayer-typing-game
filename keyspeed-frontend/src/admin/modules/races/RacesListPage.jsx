@@ -34,6 +34,7 @@ export default function RacesListPage() {
     resetFilters,
   } = useTableState({
     mode: 'all',
+    gameId: 'all',
     isPrivate: 'all',
     hasBots: false,
     hasFlagged: false,
@@ -45,6 +46,7 @@ export default function RacesListPage() {
     page,
     limit,
     mode: filters.mode,
+    gameId: filters.gameId,
     isPrivate: filters.isPrivate,
     hasBots: filters.hasBots,
     hasFlagged: filters.hasFlagged,
@@ -108,6 +110,15 @@ export default function RacesListPage() {
             </span>
           )}
         </div>
+      ),
+    },
+    {
+      key: 'gameId',
+      label: 'Game',
+      render: (_, r) => (
+        <span className="text-xs font-mono font-bold text-fg">
+          {r.gameId === 'car-race' ? '🏎️ Car Race' : '🏁 Classic'}
+        </span>
       ),
     },
     {
@@ -199,6 +210,17 @@ export default function RacesListPage() {
 
       {/* Filter Bar */}
       <FilterBar onReset={resetFilters}>
+        {/* Game filter */}
+        <select
+          value={filters.gameId}
+          onChange={(e) => setFilter('gameId', e.target.value)}
+          className="px-3 py-2 rounded-xl bg-surface border border-border text-fg text-xs focus:outline-none focus:border-accent cursor-pointer"
+        >
+          <option value="all">All Games</option>
+          <option value="classic-race">Classic Race</option>
+          <option value="car-race">Car Race</option>
+        </select>
+
         {/* Mode filter */}
         <select
           value={filters.mode}

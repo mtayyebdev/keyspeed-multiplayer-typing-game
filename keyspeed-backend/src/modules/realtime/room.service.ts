@@ -20,6 +20,11 @@ export interface HumanPlayer {
   rankScore?: number;
   lastProgressUpdate?: number;
   lastProgressIndex?: number;
+  speed?: number;
+  state?: 'running' | 'stalled' | 'idle' | 'finished';
+  topSpeed?: number;
+  avgSpeed?: number;
+  stalls?: number;
 }
 
 export type Player = HumanPlayer | BotPlayer;
@@ -28,6 +33,8 @@ export interface RoomState {
   roomId: string;
   roomCode?: string;
   isPrivate: boolean;
+  gameId: string;
+  gameConfig?: any;
   textId: string;
   text: string;
   status: 'lobby' | 'countdown' | 'racing' | 'finished';
@@ -39,7 +46,9 @@ export interface RoomState {
   timeLimitSeconds?: number;
   countdownTimer?: NodeJS.Timeout;
   botTickTimer?: NodeJS.Timeout;
+  carRaceTickTimer?: NodeJS.Timeout;
   raceTimeoutTimer?: NodeJS.Timeout;
+  carRuntimes?: Map<string, any>;
   standings: Player[];
   nextPosition: number;
 }
@@ -59,6 +68,8 @@ export class RoomService {
     text: string,
     isPrivate: boolean = false,
     roomCode?: string,
+    gameId: string = 'classic-race',
+    gameConfig?: any,
   ): RoomState {
     const players = new Map<string, Player>();
     players.set(hostPlayer.id, hostPlayer);
@@ -67,6 +78,8 @@ export class RoomService {
       roomId,
       roomCode,
       isPrivate,
+      gameId: gameId || 'classic-race',
+      gameConfig,
       textId,
       text,
       status: 'lobby',

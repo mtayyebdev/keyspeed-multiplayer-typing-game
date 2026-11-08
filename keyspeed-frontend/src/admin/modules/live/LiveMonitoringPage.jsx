@@ -146,6 +146,9 @@ export default function LiveMonitoringPage() {
                         Room: {room.roomId.slice(-8)}
                       </span>
                       <StatusBadge status={room.status} />
+                      <span className="text-[10px] font-mono font-bold uppercase bg-accent-soft text-accent px-2 py-0.5 rounded border border-accent/30">
+                        {room.gameId === 'car-race' ? '🏎️ Car Race' : '🏁 Classic'}
+                      </span>
                       {room.isPrivate && (
                         <span className="text-[10px] font-mono uppercase bg-fg/10 text-fg px-1.5 py-0.5 rounded border border-border">
                           Private: {room.roomCode}
