@@ -22,6 +22,26 @@ export function calculateWpm(charactersTyped: number, durationMs: number): numbe
 }
 
 /**
+ * Net WPM (Effective Speed) calculation:
+ * Gross Words minus uncorrected errors, divided by minutes.
+ * Each error penalizes 1 standard word (5 characters).
+ */
+export function calculateNetWpm(
+  charactersTyped: number,
+  errors: number = 0,
+  durationMs: number,
+): number {
+  if (!charactersTyped || charactersTyped <= 0 || !durationMs || durationMs < 500) {
+    return 0;
+  }
+  const minutes = durationMs / 60000;
+  const grossWords = charactersTyped / 5;
+  const netWords = Math.max(0, grossWords - errors);
+  const netWpm = Math.round(netWords / minutes);
+  return Math.max(0, netWpm);
+}
+
+/**
  * Calculates accuracy percentage and character errors compared to original text.
  */
 export function calculateAccuracy(originalText: string, typedText: string): AccuracyResult {

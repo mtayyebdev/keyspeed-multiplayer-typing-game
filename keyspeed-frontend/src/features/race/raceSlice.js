@@ -9,6 +9,8 @@ const initialState = {
   isHost: false,
   text: '',
   startAt: null,
+  endAt: null,
+  timeLimitSeconds: 60,
   countdownSeconds: null,
   players: [], // array of { id, username, progress, wpm, isBot, isHost }
   myResult: null,
@@ -52,11 +54,13 @@ const raceSlice = createSlice({
       }
     },
     setRaceReady: (state, action) => {
-      const { roomId, text, startAt, players } = action.payload;
+      const { roomId, text, startAt, endAt, timeLimitSeconds, players } = action.payload;
       state.status = 'ready';
       state.roomId = roomId;
       state.text = text;
       state.startAt = startAt;
+      state.timeLimitSeconds = timeLimitSeconds || 60;
+      state.endAt = endAt || (startAt ? startAt + state.timeLimitSeconds * 1000 : null);
       state.players = players;
       state.myResult = null;
       state.standings = [];
@@ -66,8 +70,14 @@ const raceSlice = createSlice({
       state.status = 'countdown';
       state.countdownSeconds = action.payload;
     },
-    startRacing: (state) => {
+    startRacing: (state, action) => {
       state.status = 'racing';
+      if (action?.payload?.timeLimitSeconds) {
+        state.timeLimitSeconds = action.payload.timeLimitSeconds;
+      }
+      if (action?.payload?.endAt) {
+        state.endAt = action.payload.endAt;
+      }
     },
     clearCountdown: (state) => {
       state.countdownSeconds = null;
@@ -115,6 +125,8 @@ const raceSlice = createSlice({
       state.isHost = false;
       state.text = '';
       state.startAt = null;
+      state.endAt = null;
+      state.timeLimitSeconds = 60;
       state.countdownSeconds = null;
       state.players = [];
       state.myResult = null;

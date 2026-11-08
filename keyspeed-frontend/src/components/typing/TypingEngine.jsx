@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { calculateWpm, calculateAccuracy } from '../../lib/typingMetrics';
+import { calculateWpm, calculateAccuracy, calculateNetWpm } from '../../lib/typingMetrics';
 import { soundEngine } from '../../lib/soundEngine';
-import { RotateCcw, Activity, MousePointerClick } from 'lucide-react';
+import { RotateCcw, Activity, MousePointerClick, AlertCircle } from 'lucide-react';
 
 /**
  * TypingEngine adheres strictly to Architecture Rule 4:
@@ -26,7 +26,9 @@ export default function TypingEngine({
 
   // Periodic display metrics (updated on 200ms interval, NOT per keystroke)
   const [liveWpm, setLiveWpm] = useState(0);
+  const [liveNetWpm, setLiveNetWpm] = useState(0);
   const [liveAccuracy, setLiveAccuracy] = useState(100);
+  const [liveErrors, setLiveErrors] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -45,7 +47,9 @@ export default function TypingEngine({
     timelineRef.current = [];
     lastRecordedSecRef.current = 0;
     setLiveWpm(0);
+    setLiveNetWpm(0);
     setLiveAccuracy(100);
+    setLiveErrors(0);
     setHasStarted(false);
 
     if (hiddenInputRef.current) {
@@ -103,9 +107,12 @@ export default function TypingEngine({
 
         const currentWpm = calculateWpm(currentTyped.length, elapsedMs);
         const { accuracy, errors } = calculateAccuracy(text, currentTyped);
+        const currentNetWpm = calculateNetWpm(currentTyped.length, errors, elapsedMs);
 
         setLiveWpm(currentWpm);
+        setLiveNetWpm(currentNetWpm);
         setLiveAccuracy(accuracy);
+        setLiveErrors(errors);
 
         // Record second-by-second timeline snapshot for performance analytics
         const currentSec = Math.max(1, Math.floor(elapsedMs / 1000));
@@ -114,7 +121,7 @@ export default function TypingEngine({
           const rawWpm = Math.round((currentTyped.length / 5) / (elapsedMs / 60000)) || currentWpm;
           timelineRef.current.push({
             second: currentSec,
-            wpm: currentWpm,
+            wpm: currentNetWpm,
             rawWpm,
             accuracy,
             errors,
@@ -175,6 +182,7 @@ export default function TypingEngine({
       const durationMs = Date.now() - startTimeRef.current;
       const { accuracy, errors } = calculateAccuracy(text, value);
       const finalWpm = calculateWpm(value.length, durationMs);
+      const finalNetWpm = calculateNetWpm(value.length, errors, durationMs);
       const rawWpm = Math.round((value.length / 5) / (durationMs / 60000)) || finalWpm;
 
       let correctChars = 0;
@@ -193,7 +201,7 @@ export default function TypingEngine({
       if (timeline.length === 0 || timeline[timeline.length - 1].second !== finalSec) {
         timeline.push({
           second: finalSec,
-          wpm: finalWpm,
+          wpm: finalNetWpm,
           rawWpm,
           accuracy,
           errors,
@@ -205,7 +213,9 @@ export default function TypingEngine({
         correctChars,
         errorChars,
         totalChars: text.length,
-        wpm: finalWpm,
+        wpm: finalNetWpm,
+        grossWpm: finalWpm,
+        netWpm: finalNetWpm,
         rawWpm,
         accuracy,
         errors,
@@ -237,23 +247,33 @@ export default function TypingEngine({
       {/* Live HUD */}
       {showLiveMetrics && (
         <div className="flex items-center justify-between pb-5 mb-5 border-b border-border">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-accent animate-pulse" />
               <span className="text-2xl font-black text-accent font-mono">
-                {liveWpm}
+                {liveNetWpm || liveWpm}
               </span>
-              <span className="text-xs uppercase text-fg/60 font-bold tracking-wider">
-                WPM
-              </span>
+              <div className="flex flex-col text-[10px] leading-tight text-fg/60 font-bold uppercase tracking-wider">
+                <span>NET</span>
+                <span>WPM</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-black text-fg font-mono">
+              <span className={`text-2xl font-black font-mono ${liveAccuracy < 90 ? 'text-warning' : 'text-fg'}`}>
                 {liveAccuracy}%
               </span>
               <span className="text-xs uppercase text-fg/60 font-bold tracking-wider">
                 ACC
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg border border-border">
+              <span className="text-xs uppercase text-fg/60 font-bold tracking-wider">
+                Errors:
+              </span>
+              <span className={`text-sm font-black font-mono ${liveErrors > 0 ? 'text-danger' : 'text-accent'}`}>
+                {liveErrors}
               </span>
             </div>
           </div>

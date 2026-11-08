@@ -6,7 +6,7 @@ import { UsersService } from '../users/users.service';
 import { Race, RaceDocument } from '../races/schemas/race.schema';
 import { RaceResult, RaceResultDocument } from '../races/schemas/race-result.schema';
 import { SoloSubmitDto } from './dto/solo-submit.dto';
-import { calculateWpm, calculateAccuracy } from '../../games/wpm.util';
+import { calculateWpm, calculateAccuracy, calculateNetWpm } from '../../games/wpm.util';
 import { evaluateRunAntiCheat } from '../../games/anti-cheat.util';
 import { SettingsService } from '../admin/settings/settings.service';
 
@@ -33,6 +33,7 @@ export class SoloService {
     // Server-computed metrics
     const { accuracy, errors } = calculateAccuracy(originalContent, typedText);
     const wpm = calculateWpm(typedText.length, durationMs);
+    const netWpm = calculateNetWpm(typedText.length, errors, durationMs);
 
     // Anti-cheat verification with dynamic admin threshold
     const settings = this.settingsService.getSettings();
@@ -76,6 +77,7 @@ export class SoloService {
     return {
       resultId: savedResult._id,
       wpm,
+      netWpm,
       accuracy,
       errors,
       durationMs,

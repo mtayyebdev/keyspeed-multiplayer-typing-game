@@ -6,7 +6,7 @@ import RaceTrack from '../components/race/RaceTrack';
 import CountdownOverlay from '../components/race/CountdownOverlay';
 import TypingEngine from '../components/typing/TypingEngine';
 import ResultsModal from '../components/common/ResultsModal';
-import { Trophy, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Trophy, AlertCircle, ArrowLeft, Loader2, Timer, ShieldAlert } from 'lucide-react';
 
 export default function RaceRoomPage() {
   const dispatch = useDispatch();
@@ -17,6 +17,9 @@ export default function RaceRoomPage() {
     roomId,
     text,
     countdownSeconds,
+    timeLimitSeconds,
+    startAt,
+    endAt,
     players,
     standings,
     myResult,
@@ -27,6 +30,37 @@ export default function RaceRoomPage() {
 
   const [hasFinishedLocal, setHasFinishedLocal] = useState(false);
   const [localPerfStats, setLocalPerfStats] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(timeLimitSeconds || 60);
+
+  // Synchronized Race Countdown Timer
+  useEffect(() => {
+    if (status !== 'racing') {
+      if (timeLimitSeconds) {
+        setTimeRemaining(timeLimitSeconds);
+      }
+      return;
+    }
+
+    const targetEnd =
+      endAt ||
+      (startAt ? startAt + (timeLimitSeconds || 60) * 1000 : Date.now() + 60000);
+
+    const checkTimer = () => {
+      const remainingMs = Math.max(0, targetEnd - Date.now());
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      setTimeRemaining(remainingSec);
+    };
+
+    checkTimer();
+    const interval = setInterval(checkTimer, 500);
+    return () => clearInterval(interval);
+  }, [status, endAt, startAt, timeLimitSeconds]);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   // If not in a race and no room, redirect to lobby
   useEffect(() => {
@@ -79,7 +113,7 @@ export default function RaceRoomPage() {
       />
 
       {/* Header bar */}
-      <div className="flex items-center justify-between w-full mb-6">
+      <div className="flex items-center justify-between w-full mb-6 flex-wrap gap-3">
         <button
           onClick={handleExit}
           className="flex items-center gap-1.5 text-xs text-fg/70 hover:text-fg transition-all duration-150 py-1.5 px-3 rounded-lg bg-surface border border-border hover:bg-surface-hover hover:border-strong cursor-pointer shadow-sm active:scale-95"
@@ -88,19 +122,40 @@ export default function RaceRoomPage() {
           <span>Exit Race</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-fg/60 font-semibold">
-            Status:
-          </span>
-          <span
-            className={`text-xs uppercase font-bold px-2.5 py-0.5 rounded-full border shadow-sm ${
-              status === 'racing'
-                ? 'bg-accent-soft text-accent border-accent/30 animate-pulse'
-                : 'bg-surface text-fg/70 border-border'
-            }`}
-          >
-            {status}
-          </span>
+        <div className="flex items-center gap-2.5">
+          {/* Active Race Countdown Timer */}
+          {status === 'racing' && (
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border font-mono font-bold text-xs sm:text-sm shadow-sm transition-all ${
+                timeRemaining <= 10
+                  ? 'bg-danger-soft text-danger border-danger/40 animate-pulse'
+                  : timeRemaining <= 20
+                  ? 'bg-warning-soft text-warning border-warning/40'
+                  : 'bg-surface text-accent border-accent/30'
+              }`}
+            >
+              <Timer className="w-4 h-4 shrink-0" />
+              <span>{formatTimer(timeRemaining)}</span>
+              <span className="text-[10px] font-normal uppercase opacity-75 hidden sm:inline">
+                left
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs uppercase tracking-wider text-fg/60 font-semibold hidden sm:inline">
+              Status:
+            </span>
+            <span
+              className={`text-xs uppercase font-bold px-2.5 py-0.5 rounded-full border shadow-sm ${
+                status === 'racing'
+                  ? 'bg-accent-soft text-accent border-accent/30 animate-pulse'
+                  : 'bg-surface text-fg/70 border-border'
+              }`}
+            >
+              {status}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -140,15 +195,18 @@ export default function RaceRoomPage() {
           />
 
           {hasFinishedLocal && status !== 'finished' && (
-            <div className="absolute inset-0 bg-bg/85 rounded-3xl flex flex-col items-center justify-center gap-3 z-30">
-              <div className="w-12 h-12 rounded-2xl bg-accent-soft border border-accent/30 text-accent flex items-center justify-center">
+            <div className="absolute inset-0 bg-bg/85 rounded-3xl flex flex-col items-center justify-center gap-3 z-30 p-6 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-accent-soft border border-accent/30 text-accent flex items-center justify-center shadow-sm">
                 <Trophy className="w-6 h-6 text-accent" />
               </div>
               <h3 className="text-xl font-bold text-fg">Finished!</h3>
-              <p className="text-xs text-fg/60 flex items-center gap-2">
+              <p className="text-xs text-fg/70 flex items-center justify-center gap-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
-                Waiting for remaining racers to cross the line...
+                Waiting for timer or all racers to finish...
               </p>
+              <span className="text-[11px] text-fg/50 max-w-sm">
+                Final positions are calculated by <strong>Speed & Accuracy</strong>. Fewer errors yield higher podium positions.
+              </span>
             </div>
           )}
         </div>

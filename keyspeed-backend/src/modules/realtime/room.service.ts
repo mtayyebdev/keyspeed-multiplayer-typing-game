@@ -10,11 +10,14 @@ export interface HumanPlayer {
   isHost: boolean;
   progress: number;
   wpm: number;
+  netWpm?: number;
   accuracy: number;
   errors: number;
   flagged: boolean;
   finished: boolean;
   position?: number;
+  durationMs?: number;
+  rankScore?: number;
   lastProgressUpdate?: number;
   lastProgressIndex?: number;
 }
@@ -32,6 +35,8 @@ export interface RoomState {
   hostId: string;
   createdAt: number;
   startAt?: number;
+  endAt?: number;
+  timeLimitSeconds?: number;
   countdownTimer?: NodeJS.Timeout;
   botTickTimer?: NodeJS.Timeout;
   raceTimeoutTimer?: NodeJS.Timeout;

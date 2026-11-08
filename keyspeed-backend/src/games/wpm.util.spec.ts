@@ -1,4 +1,4 @@
-import { calculateWpm, calculateAccuracy } from './wpm.util';
+import { calculateWpm, calculateAccuracy, calculateNetWpm } from './wpm.util';
 
 describe('WPM Utility', () => {
   describe('calculateWpm', () => {
@@ -18,6 +18,22 @@ describe('WPM Utility', () => {
       expect(calculateWpm(150, 30000)).toBe(60);
       // 500 characters in 60 seconds = 100 WPM
       expect(calculateWpm(500, 60000)).toBe(100);
+    });
+  });
+
+  describe('calculateNetWpm', () => {
+    it('returns same as gross WPM when errors is 0', () => {
+      expect(calculateNetWpm(300, 0, 60000)).toBe(60);
+    });
+
+    it('penalizes WPM based on errors', () => {
+      // 300 characters = 60 words. 10 errors -> 50 net words in 1 min = 50 WPM
+      expect(calculateNetWpm(300, 10, 60000)).toBe(50);
+    });
+
+    it('clamps to 0 when errors exceed typed words', () => {
+      // 100 characters = 20 words. 25 errors -> 0 WPM
+      expect(calculateNetWpm(100, 25, 60000)).toBe(0);
     });
   });
 

@@ -73,6 +73,13 @@ export function evaluateRunAntiCheat(
     return wpmCheck;
   }
 
+  if (accuracy < 30) {
+    return {
+      isFlagged: true,
+      reason: `Accuracy ${accuracy}% indicates invalid or spam keystroke submission`,
+    };
+  }
+
   for (let i = 1; i < history.length; i++) {
     const prev = history[i - 1];
     const curr = history[i];

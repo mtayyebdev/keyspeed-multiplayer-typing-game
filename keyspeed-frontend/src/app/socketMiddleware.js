@@ -114,12 +114,20 @@ export const socketMiddleware = (store) => (next) => (action) => {
         }
       });
 
+      socket.on('race:start', (data) => {
+        store.dispatch(startRacing(data));
+      });
+
       socket.on('race:update', (data) => {
         const players = data.players || data;
         store.dispatch(updateRaceProgress(players));
       });
 
       socket.on('race:finished', (data) => {
+        store.dispatch(setPlayerFinished(data));
+      });
+
+      socket.on('race:player_finished', (data) => {
         store.dispatch(setPlayerFinished(data));
       });
 

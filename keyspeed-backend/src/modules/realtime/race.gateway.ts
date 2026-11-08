@@ -467,22 +467,23 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     player.progress = 100;
     player.wpm = finalScore.wpm;
+    player.netWpm = finalScore.netWpm;
     player.accuracy = finalScore.accuracy;
     player.errors = finalScore.errors;
+    player.durationMs = durationMs;
     if (finalScore.isFlagged) {
       player.flagged = true;
     }
     player.finished = true;
-    player.position = room.nextPosition++;
-
-    room.standings.push(player);
 
     // Notify client of individual finish
-    this.server.to(client.id).emit('race:finished', {
+    this.server.to(client.id).emit('race:player_finished', {
       playerId: player.id,
-      position: player.position,
       wpm: player.wpm,
+      netWpm: player.netWpm,
       accuracy: player.accuracy,
+      errors: player.errors,
+      durationMs,
     });
 
     this.broadcastRaceUpdate(room);
@@ -496,15 +497,40 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  private calculateRankScore(player: Player): number {
+    const isFinished = player.finished && player.progress >= 100;
+    const wpm = player.wpm || 0;
+    const accuracy = player.accuracy || 0;
+    const errors = (player as HumanPlayer).errors || 0;
+    const netWpm = player.netWpm ?? Math.max(0, Math.round(wpm * (accuracy / 100)));
+
+    // 1. Completion bonus: completed racers always rank above unfinished racers
+    const completionBonus = isFinished ? 100000 : player.progress * 500;
+
+    // 2. Net WPM has high priority: speed with accuracy
+    const speedScore = netWpm * 100;
+
+    // 3. Accuracy bonus
+    const accuracyScore = accuracy * 10;
+
+    // 4. Heavy Error penalty: every mistake deducts 50 points, pulling position down
+    const errorPenalty = errors * 50;
+
+    return completionBonus + speedScore + accuracyScore - errorPenalty;
+  }
+
   private startRaceSequence(room: RoomState) {
     room.status = 'countdown';
 
     const settings = this.settingsService.getSettings();
     const countdownSeconds = settings.countdownSeconds ?? 3;
-    const raceTimeoutSeconds = settings.raceTimeoutSeconds ?? 120;
+    const raceTimeoutSeconds = settings.raceTimeoutSeconds ?? 60;
     const countdownDuration = (countdownSeconds + 1) * 1000;
     const startAt = Date.now() + countdownDuration;
+    const endAt = startAt + raceTimeoutSeconds * 1000;
     room.startAt = startAt;
+    room.endAt = endAt;
+    room.timeLimitSeconds = raceTimeoutSeconds;
 
     const playersList = Array.from(room.players.values()).map((p) => ({
       id: p.id,
@@ -520,6 +546,8 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       roomId: room.roomId,
       text: room.text,
       startAt,
+      endAt,
+      timeLimitSeconds: raceTimeoutSeconds,
       players: playersList,
     });
 
@@ -536,6 +564,13 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         clearInterval(countdownInterval);
         room.status = 'racing';
         this.startBotSimulation(room);
+
+        // Notify room that race has started along with timer info
+        this.server.to(room.roomId).emit('race:start', {
+          startAt: room.startAt,
+          endAt: room.endAt,
+          timeLimitSeconds: raceTimeoutSeconds,
+        });
 
         // Dynamic timeout limit from admin settings
         room.raceTimeoutTimer = setTimeout(() => {
@@ -557,6 +592,8 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       bot.progress = 0;
       bot.wpm = bot.targetWpm;
       bot.finished = false;
+      const botErrors = Math.round(textLength * (1 - (bot.accuracy || 95) / 100));
+      bot.errors = botErrors;
     }
 
     const tickMs = 250;
@@ -594,14 +631,17 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (bot.charsTyped >= textLength || bot.progress >= 100) {
           bot.progress = 100;
           bot.finished = true;
-          bot.position = room.nextPosition++;
-          room.standings.push(bot);
+          bot.durationMs = elapsedMs;
+          const botErrors = Math.round(textLength * (1 - (bot.accuracy || 95) / 100));
+          bot.errors = botErrors;
+          bot.netWpm = Math.max(0, Math.round((textLength / 5 - botErrors) / (elapsedMs / 60000)));
 
-          this.server.to(room.roomId).emit('race:finished', {
+          this.server.to(room.roomId).emit('race:player_finished', {
             playerId: bot.id,
-            position: bot.position,
             wpm: bot.wpm,
+            netWpm: bot.netWpm,
             accuracy: bot.accuracy,
+            errors: bot.errors,
           });
         }
         stateChanged = true;
@@ -629,15 +669,48 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (room.botTickTimer) clearInterval(room.botTickTimer);
     if (room.raceTimeoutTimer) clearTimeout(room.raceTimeoutTimer);
 
-    // Any unfinished players assigned positions by progress descending
-    const unfinished = Array.from(room.players.values())
-      .filter((p) => !p.finished)
-      .sort((a, b) => b.progress - a.progress);
+    // Compute fair position rankings for ALL players based on completion, Net WPM, accuracy, and error penalties
+    const allPlayers = Array.from(room.players.values());
 
-    for (const player of unfinished) {
-      player.position = room.nextPosition++;
+    const sortedPlayers = allPlayers.sort((a, b) => {
+      // 1. Disqualified / flagged racers placed at the bottom
+      const aFlagged = (a as HumanPlayer).flagged;
+      const bFlagged = (b as HumanPlayer).flagged;
+      if (aFlagged && !bFlagged) return 1;
+      if (!aFlagged && bFlagged) return -1;
+
+      // 2. Finished racers rank ahead of unfinished racers
+      const aDone = a.finished && a.progress >= 100;
+      const bDone = b.finished && b.progress >= 100;
+      if (aDone && !bDone) return -1;
+      if (!aDone && bDone) return 1;
+
+      // 3. Rank score (Net WPM + Accuracy - Error Penalty)
+      const aScore = this.calculateRankScore(a);
+      const bScore = this.calculateRankScore(b);
+      if (bScore !== aScore) {
+        return bScore - aScore;
+      }
+
+      // 4. Tie-breaker 1: Fewer errors wins
+      const aErrors = (a as HumanPlayer).errors ?? 0;
+      const bErrors = (b as HumanPlayer).errors ?? 0;
+      if (aErrors !== bErrors) {
+        return aErrors - bErrors;
+      }
+
+      // 5. Tie-breaker 2: Faster duration wins
+      const aDur = (a as any).durationMs || 999999;
+      const bDur = (b as any).durationMs || 999999;
+      return aDur - bDur;
+    });
+
+    room.standings = [];
+    sortedPlayers.forEach((player, idx) => {
+      player.position = idx + 1;
+      player.rankScore = this.calculateRankScore(player);
       room.standings.push(player);
-    }
+    });
 
     this.broadcastRaceUpdate(room);
 
@@ -647,6 +720,7 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       isBot: p.isBot,
       position: p.position || 0,
       wpm: p.wpm || 0,
+      netWpm: p.netWpm || p.wpm || 0,
       accuracy: p.accuracy || 100,
       errors: (p as HumanPlayer).errors || 0,
       flagged: (p as HumanPlayer).flagged || false,

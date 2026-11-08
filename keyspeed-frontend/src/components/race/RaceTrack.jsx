@@ -67,7 +67,7 @@ export default function RaceTrack({ players = [], currentUserId, currentSocketId
                   {player.finished && (
                     <span className="flex items-center gap-1 text-accent font-bold text-xs bg-accent-soft px-2 py-0.5 rounded border border-accent/20">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      #{player.position || 1}
+                      {player.position ? `#${player.position}` : 'Done'}
                     </span>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { GameEngine, PlayerProgress } from './game-engine.interface';
-import { calculateWpm, calculateAccuracy } from './wpm.util';
+import { calculateWpm, calculateAccuracy, calculateNetWpm } from './wpm.util';
 import { evaluateRunAntiCheat, validateProgressJump } from './anti-cheat.util';
 
 @Injectable()
@@ -34,10 +34,12 @@ export class ClassicRaceEngine implements GameEngine {
   ) {
     const { accuracy, errors } = calculateAccuracy(originalText, typedText);
     const wpm = calculateWpm(typedText.length, durationMs);
+    const netWpm = calculateNetWpm(typedText.length, errors, durationMs);
     const antiCheat = evaluateRunAntiCheat(wpm, accuracy, [], maxWpm, maxJump);
 
     return {
       wpm,
+      netWpm,
       accuracy,
       errors,
       isFlagged: antiCheat.isFlagged,

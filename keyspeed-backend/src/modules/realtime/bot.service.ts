@@ -20,11 +20,15 @@ export interface BotPlayer {
   isBot: true;
   progress: number;
   wpm: number;
+  netWpm?: number;
   accuracy: number;
+  errors?: number;
   targetWpm: number;
   charsTyped: number;
   finished: boolean;
   position?: number;
+  durationMs?: number;
+  rankScore?: number;
   intervalTimer?: NodeJS.Timeout;
 }
 
